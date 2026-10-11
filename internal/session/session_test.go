@@ -241,35 +241,60 @@ func TestSessionWithoutProgressHasNilProgress(t *testing.T) {
 	}
 }
 
-// 进度行里的速度应该被采进速度曲线。
+// 进度行会被采进速度曲线。
+//
+// 这里直接调 appendOutput 喂数据，而不是起一个 sh 进程打印——采样是「读到内容有变化
+// 就采一次」，结果取决于输出到达时怎么分块。走真实进程的话分块由管道调度决定，
+// 本地两条 printf 落成两次读、CI 上可能并成一次，测试就飘了（确实飘过一次）。
+// 自己控制分块才能确定地断言。
 func TestSessionRecordsSpeedHistory(t *testing.T) {
-	sess := runShell(t,
-		"printf '[1] ↓ 1.00MB/2.00MB 100.00KB/s in 1s, left 10s ............\\r'; "+
-			"printf '[1] ↓ 2.00MB/2.00MB 200.00KB/s in 2s, left 5s ............\\r'",
-		4096)
+	sess := runShell(t, "sleep 5", 4096)
+	defer func() { _ = sess.Kill() }()
 
-	select {
-	case <-sess.Done():
-	case <-time.After(10 * time.Second):
-		t.Fatal("进程没有在预期时间内结束")
-	}
+	// 两条进度行分两次喂 → 两个点。
+	sess.appendOutput([]byte("[1] ↓ 1.00MB/2.00MB 100.00KB/s in 1s, left 10s ............\r"))
+	sess.appendOutput([]byte("[1] ↓ 2.00MB/2.00MB 200.00KB/s in 2s, left 5s ............\r"))
 
 	times, speeds := sess.SpeedHistory()
 	if len(times) != len(speeds) {
 		t.Fatalf("时间与速度长度不一致: %d vs %d", len(times), len(speeds))
 	}
-	if len(speeds) < 2 {
-		t.Fatalf("两条进度行应该采出至少 2 个点，实际 %d 个", len(speeds))
+	if len(speeds) != 2 {
+		t.Fatalf("两条进度行应采出 2 个点，实际 %d 个", len(speeds))
 	}
-	if got, want := speeds[len(speeds)-1], int64(200*1024); got != want {
-		t.Errorf("最后一个速度应为 %d，实际 %d", want, got)
+	if got, want := speeds[0], int64(100*1024); got != want {
+		t.Errorf("第 1 个速度应为 %d，实际 %d", want, got)
 	}
-	// 时间轴必须是递增的毫秒时间戳。
+	if got, want := speeds[1], int64(200*1024); got != want {
+		t.Errorf("第 2 个速度应为 %d，实际 %d", want, got)
+	}
 	for i := 1; i < len(times); i++ {
 		if times[i] < times[i-1] {
 			t.Errorf("时间戳没有递增: %v", times)
 			break
 		}
+	}
+}
+
+// 一次读到多条进度行时只会采一个点：采样跟着「内容有变化」走，不是跟着行数走。
+//
+// 单文件下载的进度行是每秒一条、各自到达，所以实际不会触发；这里把这个已知行为
+// 固定下来，免得以后有人以为它是 bug 又改回去。（真要在意，可以把采样挪进解析器、
+// 每解析一条进度行采一次，但目前没有收益。）
+func TestSessionCoalescedProgressSamplesOnce(t *testing.T) {
+	sess := runShell(t, "sleep 5", 4096)
+	defer func() { _ = sess.Kill() }()
+
+	sess.appendOutput([]byte(
+		"[1] ↓ 1.00MB/2.00MB 100.00KB/s in 1s, left 10s ............\r" +
+			"[1] ↓ 2.00MB/2.00MB 200.00KB/s in 2s, left 5s ............\r"))
+
+	_, speeds := sess.SpeedHistory()
+	if len(speeds) != 1 {
+		t.Fatalf("合并在一次读取里的多条进度行只应采 1 个点，实际 %d 个", len(speeds))
+	}
+	if got, want := speeds[0], int64(200*1024); got != want {
+		t.Errorf("应采到最后一条的速度 %d，实际 %d", want, got)
 	}
 }
 
