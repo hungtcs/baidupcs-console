@@ -32,10 +32,15 @@ const (
 
 // Task 是暴露给 HTTP API 的任务描述，不含输出内容本身。
 type Task struct {
-	ID          string     `json:"id"`
-	Name        string     `json:"name"`
-	RemotePath  string     `json:"remotePath"`
-	SaveDir     string     `json:"saveDir"`
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	RemotePath string `json:"remotePath"`
+	SaveDir    string `json:"saveDir"`
+	// IsDir 表示下载的是整个目录（界面据此区分文件夹/文件图标）。
+	IsDir bool `json:"isDir"`
+	// Resumable 表示磁盘上还有未下完的分片，重跑这条命令会从断点接着下，
+	// 界面上因此显示「继续」而不是「重新开始」。
+	Resumable   bool       `json:"resumable"`
 	Args        []string   `json:"args"`
 	CommandLine string     `json:"commandLine"`
 	Status      Status     `json:"status"`
@@ -43,6 +48,10 @@ type Task struct {
 	PID         int        `json:"pid"`
 	StartedAt   time.Time  `json:"startedAt"`
 	FinishedAt  *time.Time `json:"finishedAt"`
+
+	// Progress 是从终端输出里解析出来的下载进度，还没解析到时为 nil。
+	// 终端输出仍然是权威的，这只是给界面用的一份结构化快照。
+	Progress *pcs.Progress `json:"progress,omitempty"`
 }
 
 // subBuffer 是单个订阅者的待发队列长度。慢到这个数还没被消费掉，
@@ -57,6 +66,8 @@ type Session struct {
 	stdin  io.WriteCloser
 	mu     sync.Mutex
 	buf    *ringBuffer
+	parser *pcs.ProgressParser
+	speeds speedHistory
 	subs   map[chan []byte]struct{}
 	killed bool
 	done   chan struct{}
@@ -88,6 +99,41 @@ func (r *ringBuffer) snapshot() []byte {
 	return out
 }
 
+// maxSpeedSamples 是速度曲线保留的采样点数。进度行大约每秒一条，
+// 所以 300 点就是最近 5 分钟。
+const maxSpeedSamples = 300
+
+// speedHistory 是画速度曲线用的采样环。
+//
+// 只在内存里，不落盘：曲线是「看当下」的东西，没有长期价值，而任务 JSON 是要
+// 被每 2 秒轮询的，塞进去只会让它变胖。
+type speedHistory struct {
+	times  []int64 // Unix 毫秒
+	speeds []int64 // 字节/秒
+}
+
+func (h *speedHistory) append(t, speed int64) {
+	h.times = append(h.times, t)
+	h.speeds = append(h.speeds, speed)
+
+	if len(h.times) <= maxSpeedSamples {
+		return
+	}
+	// 一次多丢一些，避免每秒都搬一次内存。
+	drop := len(h.times) - maxSpeedSamples
+	h.times = append(h.times[:0], h.times[drop:]...)
+	h.speeds = append(h.speeds[:0], h.speeds[drop:]...)
+}
+
+// snapshot 返回两份拷贝，调用方可以放心拿去序列化。
+func (h *speedHistory) snapshot() (times, speeds []int64) {
+	times = make([]int64, len(h.times))
+	speeds = make([]int64, len(h.speeds))
+	copy(times, h.times)
+	copy(speeds, h.speeds)
+	return times, speeds
+}
+
 // newID 生成任务 ID，形如 t_1a2b3c4d。
 func newID() string {
 	var b [4]byte
@@ -103,6 +149,7 @@ type startOptions struct {
 	Name       string
 	RemotePath string
 	SaveDir    string
+	IsDir      bool
 	CLIPath    string
 	Args       []string
 
@@ -129,6 +176,7 @@ func start(opts startOptions) (*Session, error) {
 			Name:        opts.Name,
 			RemotePath:  opts.RemotePath,
 			SaveDir:     opts.SaveDir,
+			IsDir:       opts.IsDir,
 			Args:        opts.Args,
 			CommandLine: pcs.CommandLine(opts.CLIPath, opts.Args),
 			Status:      StatusRunning,
@@ -137,6 +185,8 @@ func start(opts startOptions) (*Session, error) {
 		cmd:    cmd,
 		stdin:  stdin,
 		buf:    &ringBuffer{max: opts.BufferBytes},
+		parser: pcs.NewProgressParser(),
+		speeds: speedHistory{},
 		subs:   make(map[chan []byte]struct{}),
 		done:   make(chan struct{}),
 		onExit: opts.OnExit,
@@ -208,10 +258,12 @@ func newRestoredSession(t Task) *Session {
 	close(done)
 
 	return &Session{
-		task: t,
-		buf:  &ringBuffer{max: 0},
-		subs: make(map[chan []byte]struct{}),
-		done: done,
+		task:   t,
+		buf:    &ringBuffer{max: 0},
+		parser: pcs.NewProgressParser(),
+		speeds: speedHistory{},
+		subs:   make(map[chan []byte]struct{}),
+		done:   done,
 	}
 }
 
@@ -225,6 +277,7 @@ func (s *Session) appendOutput(p []byte) (int, error) {
 	defer s.mu.Unlock()
 
 	s.buf.write(chunk)
+	s.updateProgressLocked(chunk)
 	for ch := range s.subs {
 		select {
 		case ch <- chunk:
@@ -237,13 +290,56 @@ func (s *Session) appendOutput(p []byte) (int, error) {
 	return len(p), nil
 }
 
+// updateProgressLocked 把新到的输出喂给进度解析器，有变化就更新任务快照。
+// 调用方必须已持有 s.mu。
+func (s *Session) updateProgressLocked(chunk []byte) {
+	s.parser.Write(chunk)
+
+	prog := s.parser.Snapshot()
+	if prog == nil {
+		return
+	}
+	// Progress 里全是可比较的字段，直接比结构体就知道有没有变化。
+	if s.task.Progress != nil && *s.task.Progress == *prog {
+		return
+	}
+	s.task.Progress = prog
+	// 只有进度变了才会走到这里，而进度行的耗时字段每秒都在变，
+	// 所以这里天然就是「每秒一个点」的节奏。
+	s.speeds.append(time.Now().UnixMilli(), prog.Speed)
+}
+
+// SpeedHistory 返回速度曲线的采样点，供终端 WebSocket 在连接时一次性下发。
+func (s *Session) SpeedHistory() (times, speeds []int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.speeds.snapshot()
+}
+
 // Task 返回任务当前状态的快照。
 func (s *Session) Task() Task {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	t := s.task
 	t.Args = append([]string(nil), s.task.Args...)
+	if s.task.Progress != nil {
+		// Progress 一旦生成就不再改动（有变化是换一个新指针），
+		// 但拷贝一份出去更稳妥，避免调用方误改。
+		prog := *s.task.Progress
+		t.Progress = &prog
+	}
 	return t
+}
+
+// SetResumable 更新「能不能续传」的判断。
+//
+// 这个值要靠文件系统才知道，所以由 Manager 在进程结束后算好再回填，
+// 而不是在 Task() 里现场算（列表每 2 秒轮询一次，不能每次都去走目录）。
+func (s *Session) SetResumable(v bool) {
+	s.mu.Lock()
+	s.task.Resumable = v
+	s.mu.Unlock()
 }
 
 // Done 在进程结束后关闭。

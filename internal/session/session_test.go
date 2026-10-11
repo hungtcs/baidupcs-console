@@ -192,3 +192,120 @@ func TestTaskSnapshotIsIndependent(t *testing.T) {
 		t.Error("Task() 应该返回 Args 的拷贝，外部改动不该影响内部状态")
 	}
 }
+
+// 进程输出里的进度行应当被解析进 Task.Progress。
+func TestSessionParsesProgress(t *testing.T) {
+	sess := runShell(t,
+		"printf '[1] 准备下载: /我的资源/big.bin\\n'; "+
+			"printf '[1] ↓ 1.00MB/2.00MB 100.00KB/s in 10s, left 10s ............\\r'; "+
+			"printf '[1] 下载完成, 保存位置: /tmp/big.bin\\n'; "+
+			"printf '下载结束, 时间: 10s, 数据总量: 2.00MB\\n'",
+		4096)
+
+	select {
+	case <-sess.Done():
+	case <-time.After(10 * time.Second):
+		t.Fatal("进程没有在预期时间内结束")
+	}
+
+	prog := sess.Task().Progress
+	if prog == nil {
+		t.Fatal("应该从输出里解析出进度")
+	}
+	if prog.CurrentName != "big.bin" {
+		t.Errorf("当前文件名错误: %q", prog.CurrentName)
+	}
+	if prog.TotalBytes != 2<<20 {
+		t.Errorf("总量应为 %d，实际 %d", 2<<20, prog.TotalBytes)
+	}
+	if !prog.Finished {
+		t.Error("输出里有「下载结束」，应该标记为 Finished")
+	}
+	if prog.Percent != 100 {
+		t.Errorf("看到「下载完成」后应为 100%%，实际 %v", prog.Percent)
+	}
+}
+
+// 没有进度行的任务，Progress 应该保持 nil，前端据此不显示进度条。
+func TestSessionWithoutProgressHasNilProgress(t *testing.T) {
+	sess := runShell(t, "printf 'nothing to see here\\n'", 4096)
+
+	select {
+	case <-sess.Done():
+	case <-time.After(10 * time.Second):
+		t.Fatal("进程没有在预期时间内结束")
+	}
+
+	if prog := sess.Task().Progress; prog != nil {
+		t.Errorf("没有进度行时不该有进度，实际 %+v", prog)
+	}
+}
+
+// 进度行里的速度应该被采进速度曲线。
+func TestSessionRecordsSpeedHistory(t *testing.T) {
+	sess := runShell(t,
+		"printf '[1] ↓ 1.00MB/2.00MB 100.00KB/s in 1s, left 10s ............\\r'; "+
+			"printf '[1] ↓ 2.00MB/2.00MB 200.00KB/s in 2s, left 5s ............\\r'",
+		4096)
+
+	select {
+	case <-sess.Done():
+	case <-time.After(10 * time.Second):
+		t.Fatal("进程没有在预期时间内结束")
+	}
+
+	times, speeds := sess.SpeedHistory()
+	if len(times) != len(speeds) {
+		t.Fatalf("时间与速度长度不一致: %d vs %d", len(times), len(speeds))
+	}
+	if len(speeds) < 2 {
+		t.Fatalf("两条进度行应该采出至少 2 个点，实际 %d 个", len(speeds))
+	}
+	if got, want := speeds[len(speeds)-1], int64(200*1024); got != want {
+		t.Errorf("最后一个速度应为 %d，实际 %d", want, got)
+	}
+	// 时间轴必须是递增的毫秒时间戳。
+	for i := 1; i < len(times); i++ {
+		if times[i] < times[i-1] {
+			t.Errorf("时间戳没有递增: %v", times)
+			break
+		}
+	}
+}
+
+// snapshot 返回的必须是拷贝，调用方改它不该影响内部状态。
+func TestSpeedHistorySnapshotIsCopy(t *testing.T) {
+	sess := runShell(t, "sleep 5", 4096)
+	defer func() { _ = sess.Kill() }()
+
+	sess.mu.Lock()
+	sess.speeds.append(1000, 111)
+	sess.speeds.append(2000, 222)
+	sess.mu.Unlock()
+
+	times, speeds := sess.SpeedHistory()
+	times[0] = 99999
+	speeds[0] = 99999
+
+	again, againSpeeds := sess.SpeedHistory()
+	if again[0] == 99999 || againSpeeds[0] == 99999 {
+		t.Error("SpeedHistory 应该返回拷贝，外部改动不该影响内部状态")
+	}
+}
+
+// 采样环要有上限，长时间下载不能把内存养肥。
+func TestSpeedHistoryIsBounded(t *testing.T) {
+	var h speedHistory
+	for i := 0; i < maxSpeedSamples*3; i++ {
+		h.append(int64(i), int64(i))
+	}
+
+	times, speeds := h.snapshot()
+	if len(times) != maxSpeedSamples || len(speeds) != maxSpeedSamples {
+		t.Fatalf("应保留 %d 个点，实际 %d/%d", maxSpeedSamples, len(times), len(speeds))
+	}
+	// 保留的必须是最新的那一段。
+	if got := times[len(times)-1]; got != int64(maxSpeedSamples*3-1) {
+		t.Errorf("最后一条应该是最新的，实际 %d", got)
+	}
+}

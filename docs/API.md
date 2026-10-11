@@ -24,13 +24,42 @@ stdout/stderr 字节透传给浏览器、提供列目录和任务增删这几个
   "name": "595274 ARM Cortex-M3与Cortex-M4权威指南.pdf",  // 展示名
   "remotePath": "/我的资源/595274 ARM Cortex-M3与Cortex-M4权威指南.pdf",
   "saveDir": "/home/hungtcs/Downloads",   // 落盘目录（即 --saveto 的值）
+  "isDir": false,            // 下载的是整个目录（界面据此区分文件夹/文件图标）
+  "resumable": true,         // 磁盘上还有未下完的分片，重跑会从断点接着下
   "args": ["download", "--saveto", "/home/hungtcs/Downloads", "--mode", "locate", "/我的资源/..."],
   "commandLine": "BaiduPCS-Go download --saveto /home/hungtcs/Downloads --mode locate /我的资源/...",
   "status": "running",       // running | exited | killed
   "exitCode": 0,             // killed 时为 -1；注意 CLI 出错时退出码也是 0
   "pid": 100742,
   "startedAt": "2026-10-11T21:46:03.935747203+08:00",
-  "finishedAt": null         // RFC3339 或 null
+  "finishedAt": null,        // RFC3339 或 null
+  "progress": { /* 可选，见下 */ }
+}
+```
+
+### Progress
+
+从 CLI 输出里解析出来的进度。**终端输出仍然是权威的**，这只是给界面用的一份结构化快照；
+没有进度行时该字段不存在（`undefined`）。
+
+目录下载时 CLI 逐文件打印，且事先不告诉目录总大小，所以这里以**当前正在下载的那个文件**
+为准，另外给出文件计数。单文件任务下 `filesTotal` 就是 1。
+
+```jsonc
+{
+  "currentName": "adx.gif",   // 当前文件名，来自「准备下载: <路径>」
+  "doneText": "1.88MB",       // 原样文本，直接显示才能与终端一致
+  "totalText": "139.20MB",
+  "doneBytes": 1971322,
+  "totalBytes": 145961465,
+  "percent": 1.35,            // 0-100；总量未知时为 0
+  "speedText": "100.99KB/s",
+  "speed": 103414,            // 字节/秒
+  "elapsedText": "54s",
+  "etaText": "23m12s",        // 原样，未知时是 "-"
+  "filesDone": 0,
+  "filesTotal": 1,
+  "finished": false           // 看到过「下载结束」
 }
 ```
 
@@ -43,7 +72,18 @@ stdout/stderr 字节透传给浏览器、提供列目录和任务增删这几个
 | `killed` | 进程是被 `/kill` 或 `/restart` 主动结束的，**或者服务重启导致进程被杀** |
 
 任务记录会持久化到 `<BPCS_DATA_DIR>/tasks/<id>.json`，服务重启后自动恢复。上次是 `running`
-的任务恢复出来一律是 `killed`（进程确实随服务退出了），点「重新开始」即可从断点续传。
+的任务恢复出来一律是 `killed`（进程确实随服务退出了），点「继续」即可从断点续传。
+
+### `resumable` 与「继续 / 重新开始」
+
+`resumable` 由后端读文件系统判定：CLI 会给没下完的文件留一个
+`<文件名>.BaiduPCS-Go-downloading` 标记，下完就删掉。所以
+
+- 有标记（单文件看目标旁边的标记，目录则看树里有没有任意一个）→ `resumable: true` → 界面显示「继续」；
+- 没有标记（还没开始下、或已经下完）→ `resumable: false` → 界面显示「重新开始」。
+
+它只在进程结束后算一次（进程结束时、以及服务启动恢复任务时），不在每次列表轮询时现算——
+那要读文件系统，不能每 2 秒来一遍。
 
 > **终端输出不持久化。** 恢复出来的任务没有终端历史，连上 WebSocket 会立刻收到关闭帧
 > （code 1000）。
@@ -104,8 +144,36 @@ stdout/stderr 字节透传给浏览器、提供列目录和任务增删这几个
 
 `GET /api/tasks/{id}/terminal`
 
-**服务端 → 客户端**：全部是**二进制帧**，内容是进程 stdout/stderr 的原始字节，
-前端应直接丢给 `term.write()`。
+**服务端 → 客户端**：
+
+- **二进制帧**：进程 stdout/stderr 的原始字节，前端应直接丢给 `term.write()`。
+- **文本帧**：JSON 控制消息，目前有两种。
+
+  进度：
+
+  ```jsonc
+  {
+    "type": "progress",
+    "progress": { /* 同 Task.progress */ },
+    "t": 1728660000000        // 这条采样的 Unix 毫秒时间，用于给速度曲线打点
+  }
+  ```
+
+  连接建立后立刻推一次，之后每秒读一次任务快照、**有变化才发**；进程结束时再发一次最终进度，
+  然后才关闭连接。
+
+  速度历史（**连接建立时发一次**，之后由 progress 的 `t` 往尾巴上追加）：
+
+  ```jsonc
+  {
+    "type": "speedHistory",
+    "times":  [1728659700000, 1728659701000],  // Unix 毫秒
+    "speeds": [103414, 0]                      // 字节/秒
+  }
+  ```
+
+  后端为每个任务保留最近 300 个采样点（进度行约每秒一条，即最近 5 分钟）。没有数据时
+  这一帧不会发。**采样只在内存里，不落盘**，所以服务重启后曲线从零开始。
 
 连接建立时会先把该任务已积累的输出**整体重放一遍**（内存里最多保留 4MB，超出后丢弃最旧的部分），
 所以刷新页面、或任务跑了一半才连上，都能看到完整历史。进程结束时服务端会主动关闭连接，

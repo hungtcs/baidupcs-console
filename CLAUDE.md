@@ -32,11 +32,17 @@ go test -race ./...          # 涉及并发改动时跑这个
 
 ## 核心设计
 
-**后端不解析任何 CLI 输出。** 它只做三件事：把 `BaiduPCS-Go` 当后台进程跑起来、把进程的 stdout/stderr **原始字节**通过 WebSocket 透传、提供列目录和任务增删这几个接口。
+**终端输出是权威的，结构化数据只是附赠的便利。** 后端把 `BaiduPCS-Go` 当后台进程跑起来，把进程的 stdout/stderr **原始字节**通过 WebSocket 透传；进度条、`\r` 覆盖刷新、ANSI 颜色全部交给前端的 xterm.js。
 
-进度条、`\r` 覆盖刷新、ANSI 颜色全部交给前端的 xterm.js。因此**任务对象里没有 `progress` / `speed` / `eta` 字段**——进度就在终端文本里。任何"帮前端把进度解析出来"的想法都违背这个设计。
+在此之上有两处**额外**的解析，都是为了让界面更好用，而不是取代终端：
 
-唯一的例外是 `ls`：文件列表需要结构化数据（可点击的目录导航），所以 `internal/pcs` 会解析它。为了不让解析结果与 CLI 显示产生偏差，`Entry` 同时返回结构化值和**原样文本**（`sizeText`、`modTimeText`），前端显示用原样文本，且**不重排顺序**（`entries` 的顺序就是 `ls` 的输出顺序）。
+- **`ls`** → `pcs.Entry`（可点击的目录导航）。为避免解析结果与 CLI 显示产生偏差，`Entry` 同时返回结构化值和**原样文本**（`sizeText`、`modTimeText`），前端显示用原样文本，且**不重排顺序**（`entries` 的顺序就是 `ls` 的输出顺序）。
+- **`download` 的进度行** → `pcs.Progress`（终端上方的进度条）。同样带上 `doneText` / `totalText` / `speedText` / `etaText` 这些原样文本。
+
+两条原则：
+
+1. **解析失败不能影响终端。** 终端字节照常透传，解析只是旁路。正则匹配不上就什么都不做，绝不因为解析不出进度就丢字节或报错。
+2. **要与 CLI 显示一致时，透传原始文本而不是反推。** CLI 的大小列有自己的精度（`465.96MB`）和四舍五入（`139.199700MB`），从字节数格式化回去不保证还原。
 
 ## 架构
 
@@ -67,10 +73,29 @@ docs/API.md      接口契约（改接口必须同步改这里）
 - 写 `s.task` 的字段一律在锁内（`PID` 也是），因为 `Task()` / `List()` 会并发读。
 - 慢订阅者（通道满）会被直接断开，前端重连后会拿到完整重放。
 
+### 进度解析（`internal/pcs/progress.go`）
+
+进度行原样长这样（实测 v4.0.2，**圆点固定 12 个，不随终端宽度变化**）：
+
+```
+[1] ↓ 128.00KB/139.20MB 213.21KB/s in 1s, left 11m7s ............
+[1] ↓ 1.88MB/139.20MB 0B/s in 55s, left - ............
+```
+
+两个容易踩的点：
+
+- **输出是按块到达的，一块可能在半行处断开**，`ProgressParser` 因此会缓存未完成的那一段。逐字节喂入与一次性喂入的结果必须完全一致，有专门用例守这一点。
+- **最新那条进度行往往还没以 `\r` 收尾**（进度行是先写内容、下一条行首才补 `\r`）。只处理已终结的行会永远慢一拍，所以 `Snapshot()` 会额外对尾部缓冲试一次——但**只按进度行正则**，因为那个正则要求尾部完整（`in 1s, left 11m7s`），半截的行匹配不上；而「准备下载: <路径>」被截断会得到错误的文件名。
+
+**目录下载**：CLI 逐文件打印，索引 `[N]` 递增，且事先不告诉目录总大小。所以 `Progress` 以**当前文件**为准，另外给出 `filesDone` / `filesTotal`（单文件任务下 `filesTotal` 为 1）。不要试图把多个文件的字节数聚合成一个总百分比——分母是逐渐长出来的，百分比会来回跳。
+
+进度通过**终端 WebSocket 的文本帧**推给前端（二进制帧仍是终端字节），`writeTerminal` 里每秒读一次任务快照、有变化才发。改这个协议要同步改 `useTerminal.ts` 的 `handleControlMessage`。
+
 ### 任务落盘与生命周期
 
 - 所有任务都 `--saveto <BPCS_SAVE_ROOT>`（默认 `~/Downloads`），**平铺**，不建每任务子目录。不同网盘目录下的同名文件会冲突，CLI 会跳过后者。
 - **暂停 = kill 进程，继续 = 重跑同一条命令**（`/restart`）。BaiduPCS-Go 支持断点续传，已下载的分片和 `.BaiduPCS-Go-downloading` 元数据会保留。
+- `Task.Resumable` 决定界面按钮显示「继续」还是「重新开始」，由 `Manager.IsResumable` 读文件系统判定：CLI 给没下完的文件留 `<文件名>.BaiduPCS-Go-downloading` 标记，**下完会删掉**，所以「有标记 = 可续传」。这个判断**只在进程结束后和启动恢复时各算一次**（`onProcessExit` / `restore`），不能放进 `Task()`/`List()`——列表每 2 秒轮询一次，每次去走目录会拖垮它。
 - 进程用独立进程组启动（`Setpgid` + `Pdeathsig`），kill 时对 `-pid` 发信号，连带子进程一起收掉。
 - **终端输出不持久化**，只在内存环形缓冲里（每任务 `BPCS_OUTPUT_BUFFER_BYTES`，默认 4MB）。重启后任务还在但终端是空的。
 
@@ -105,18 +130,46 @@ docs/API.md      接口契约（改接口必须同步改这里）
 
 ## 测试约定
 
-- `internal/pcs/pcs_test.go` 里的 CLI 输出样本是从真实 v4.0.2 上原样抄下来的（含中文对齐的尾随空格）。改解析逻辑时这些用例必须继续通过，不要为了迁就新代码去改样本。
-- 解析逻辑都拆成了纯函数（`parseLs`、`parseMeta`、`parseSize`、`extractError`），就是为了能脱离真实 CLI 做单元测试。新增解析逻辑请沿用这个模式。
+- `internal/pcs/pcs_test.go` 里的 CLI 输出样本是从真实 v4.0.2 上原样抄下来的（含中文对齐的尾随空格）；`internal/pcs/testdata/*.raw` 更是直接 `> file 2>&1` 录下来的原始字节（含 `\r`）。改解析逻辑时这些用例必须继续通过，不要为了迁就新代码去改样本。
+- 解析逻辑都拆成了纯函数（`parseLs`、`parseMeta`、`parseSize`、`extractError`）或纯类型（`ProgressParser`），就是为了能脱离真实 CLI 做单元测试。新增解析逻辑请沿用这个模式。
+- 要新增真实输出样本，就跑一次 CLI 重定向到 `internal/pcs/testdata/`，别手写——手写很容易丢掉 `\r` 和尾随空格这些关键细节。
 - `internal/session` 的测试用 `/bin/sh` 当被测进程，不依赖真实的 BaiduPCS-Go。
 - `internal/httpapi` 的测试用 `httptest` + `fstest.MapFS`，不起真实服务、不碰真实网盘。
 
 ## 前端约定
 
-- **除 `react` / `react-dom` / `@xterm/xterm` / `@xterm/addon-fit` 外不要新增 npm 依赖**（无 UI 框架、无 Tailwind、无 axios、无路由库）。样式用普通 CSS + CSS 变量，深色主题。
-- 终端 WebSocket 收到的是**二进制帧**，必须用流式 `TextDecoder` 解码后再喂给 xterm；且**每条连接都要新建 decoder**——重连时服务端会从头重放，沿用旧 decoder 残留的半截多字节 UTF-8 会把重放开头解坏。
+- **可用的 npm 依赖只有这几个：`react`、`react-dom`、`@xterm/xterm` + `@xterm/addon-fit`、`react-icons`、`uplot`。** 不要引入 UI 框架、Tailwind、axios、路由库或状态管理库。样式用普通 CSS + CSS 变量，深色主题。
+- 图标一律用 `react-icons/lu`（Lucide）。**新增图标前先确认名字存在**：`grep "declare const LuXxx:" node_modules/react-icons/lu/index.d.ts`。
+- 文件类型图标走 `src/fileIcon.ts` 的 `renderFileIcon(name, isDir, className)`，按扩展名映射。它用 `createElement` 而不是 `const Icon = ...` + `<Icon />`，因为后者会触发 oxlint 的 `react(static-components)` 规则。新增映射请沿用这个写法。
+- 终端 WebSocket 收到的**二进制帧**是终端字节，必须用流式 `TextDecoder` 解码后再喂给 xterm；且**每条连接都要新建 decoder**——重连时服务端会从头重放，沿用旧 decoder 残留的半截多字节 UTF-8 会把重放开头解坏。
+- 终端 WebSocket 收到的**文本帧**是 JSON 控制消息（目前只有 `{"type":"progress",...}`），走 `handleControlMessage`。解析失败要静默忽略，不要抛出去打断终端。
 - 服务端在进程结束时以 **code 1000** 主动关闭连接，那是正常结束，**不要重连**；只有异常断开才退避重连。
-- 任务列表靠 `GET /api/tasks` **每 2 秒轮询**（后端没有列表推送）。用签名比对跳过内容未变的 setState，避免整列表闪动。
+- 因此终端不能只依赖 taskId：**点「继续」时任务 ID 不变，但后端会替换掉整个会话**（新进程、新输出缓冲），而旧连接早已按 1000 正常关闭。只看 taskId 的话 effect 不会重跑，前端会一直挂在死连接上，必须刷新页面才有内容。`useTerminal(taskId, runId)` 的第二个参数传 `startedAt` 当「这一轮运行」的标识，重启瞬间就会自动重连。改这块务必连同 `useTasks` 的签名一起想——`startedAt` 必须参与签名，否则列表状态不更新，runId 也就永远不变。
+- 任务列表靠 `GET /api/tasks` **每 2 秒轮询**（后端没有列表推送）。`useTasks` 用签名比对跳过内容未变的 setState；**签名里必须带上 progress 和 resumable**，否则列表上的进度条不会动。
+- 选中任务的进度有两条来源：列表轮询（2 秒）和终端 WebSocket（1 秒）。`App` 用后者覆盖 `listTasks` 里对应的那一条，让正在看的任务跟手一些。
 - React Compiler 已启用；StrictMode 会双调用 effect，创建 xterm / WebSocket 的地方要保证 cleanup 干净。
+
+### 速度曲线（`uplot`）
+
+后端为每个任务在内存里保留最近 300 个速度采样（`speedHistory`，进度行约每秒一条，即最近 5 分钟），
+**不落盘**——曲线是「看当下」的东西，而任务 JSON 要被每 2 秒轮询，塞进去只会让它变胖。
+
+- WS 连接时下发一次 `{"type":"speedHistory","times":[...],"speeds":[...]}`；之后每条 `progress`
+  消息带一个 `t`（Unix 毫秒），前端据此往尾巴上追加。**时间轴统一用后端的时钟**，否则两条来源会错位。
+- `SpeedChart` 是 uPlot 的薄包装：实例只建一次，数据变了 `setData`，容器变了 `setSize`。
+  注意 uPlot 的 x 轴单位是**秒**，传进去要 `/1000`。
+- 合计速度曲线不一样：后端没有「所有任务总和」这种东西，它是 `useTasks` 在**轮询回调里**采样的
+  （约 2 秒一个点），刷新页面就没了。采样放轮询回调而不是 effect 里，否则会触发
+  oxlint 的 `react(set-state-in-effect)`——顺带也确实是「由引起变化的事件来更新」这个更正确的做法。
+
+## 界面状态
+
+- 没选中任务时右侧显示**概览页**（`Overview.tsx`）：统计卡片 + 正在下载列表 + 合计速度曲线 + 运行环境。
+  侧栏列表上方有一个常驻的「概览」入口（`.nav-item`），否则选中任务后就回不去了。
+- **终端容器始终挂载**（`ref` 必须一直在），没输出时只是加 `.is-hidden` 设成 `visibility: hidden`，
+  而不是不渲染。用 `visibility` 而不是 `display` 是因为 FitAddon 要能量到尺寸，`display: none` 会量到 0。
+  「有没有输出」由 `useTerminal` 的 `hasOutput` 判断（收到过非空二进制帧）。停止且从未有输出的任务
+  （典型是服务重启后恢复出来的）显示空状态而不是一块黑窗口。
 
 ## 安全
 

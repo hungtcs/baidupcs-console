@@ -15,6 +15,13 @@ export interface Task {
   remotePath: string
   /** 落盘目录（即 --saveto 的值） */
   saveDir: string
+  /** 下载的是整个目录（界面据此区分文件夹/文件图标） */
+  isDir: boolean
+  /**
+   * 磁盘上还有未下完的分片，重跑会从断点接着下。
+   * 界面据此把按钮显示成「继续」而不是「重新开始」。
+   */
+  resumable: boolean
   args: string[]
   commandLine: string
   status: TaskStatus
@@ -24,6 +31,36 @@ export interface Task {
   startedAt: string
   /** RFC3339 或 null */
   finishedAt: string | null
+  /** 从终端输出解析出来的进度；还没解析到或没有进度行时为 undefined */
+  progress?: Progress
+}
+
+/**
+ * 从 download 输出里解析出来的进度。
+ *
+ * 目录下载时 CLI 逐文件打印，且事先不告诉目录总大小，所以这里以「当前正在下载的
+ * 那个文件」为准，另外给出已完成/已知的文件数。单文件任务下 filesTotal 就是 1。
+ *
+ * doneText / totalText / speedText / etaText 是 CLI 的原样文本，直接显示才能和终端一致。
+ */
+export interface Progress {
+  currentName: string
+  doneText: string
+  totalText: string
+  doneBytes: number
+  totalBytes: number
+  /** 0-100；总量未知时为 0 */
+  percent: number
+  speedText: string
+  /** 字节/秒 */
+  speed: number
+  elapsedText: string
+  /** 原样，未知时是 "-" */
+  etaText: string
+  filesDone: number
+  filesTotal: number
+  /** 看到过「下载结束」 */
+  finished: boolean
 }
 
 export interface BrowseEntry {

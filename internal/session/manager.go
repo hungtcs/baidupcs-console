@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -64,17 +66,24 @@ func (m *Manager) restore() {
 	// 按开始时间排序，保证恢复后的列表顺序稳定（List 会再倒过来）。
 	sort.Slice(tasks, func(i, j int) bool { return tasks[i].StartedAt.Before(tasks[j].StartedAt) })
 
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	for _, t := range tasks {
+	for i := range tasks {
+		t := &tasks[i]
 		if t.Status == StatusRunning {
+			// 进程是随服务一起退出的，状态没失真。
 			t.Status = StatusKilled
 		}
 		if t.FinishedAt == nil {
 			now := time.Now()
 			t.FinishedAt = &now
 		}
+		// 要读文件系统，所以在加锁之前算完。
+		t.Resumable = m.IsResumable(*t)
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for _, t := range tasks {
 		m.sessions[t.ID] = newRestoredSession(t)
 		m.order = append(m.order, t.ID)
 	}
@@ -87,6 +96,53 @@ func (m *Manager) persist(t Task) {
 	if err := m.store.Save(t); err != nil {
 		slog.Error("保存任务失败", "id", t.ID, "error", err)
 	}
+}
+
+// onProcessExit 在进程结束后收尾：判断还能不能续传，落盘，并把结论回填给会话。
+//
+// 判断放在这里而不是放在 Task()/List() 里，是因为它要读文件系统：进程结束后算一次
+// 就够，不必让每 2 秒一次的列表轮询去反复走目录。
+func (m *Manager) onProcessExit(t Task) {
+	t.Resumable = m.IsResumable(t)
+	m.persist(t)
+
+	if sess, err := m.Get(t.ID); err == nil {
+		sess.SetResumable(t.Resumable)
+	}
+}
+
+// downloadingSuffix 是 CLI 给「没下完的文件」加的标记后缀，下完会删掉它。
+// 所以它就是「这个任务还能断点续传」的权威信号。
+const downloadingSuffix = ".BaiduPCS-Go-downloading"
+
+// IsResumable 判断磁盘上是否还留着未下完的分片。
+func (m *Manager) IsResumable(t Task) bool {
+	target := filepath.Join(m.cfg.SaveRoot, t.Name)
+
+	info, err := os.Stat(target)
+	if err != nil {
+		// 目标本身就不在，没什么可续的。
+		return false
+	}
+
+	if !info.IsDir() {
+		_, err := os.Stat(target + downloadingSuffix)
+		return err == nil
+	}
+
+	// 目录下载：标记散落在各个未下完的文件旁边，找到任意一个就够。
+	found := false
+	_ = filepath.WalkDir(target, func(_ string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil // 单个条目读不了就跳过，不影响结论
+		}
+		if !d.IsDir() && strings.HasSuffix(d.Name(), downloadingSuffix) {
+			found = true
+			return fs.SkipAll
+		}
+		return nil
+	})
+	return found
 }
 
 // StartDownload 校验远端路径后，把下载命令作为后台进程跑起来。
@@ -122,10 +178,11 @@ func (m *Manager) StartDownload(ctx context.Context, remotePath string) (Task, e
 		Name:        name,
 		RemotePath:  remotePath,
 		SaveDir:     m.cfg.SaveRoot,
+		IsDir:       meta.IsDir,
 		CLIPath:     m.cfg.CLIPath,
 		Args:        args,
 		BufferBytes: m.cfg.OutputBufferBytes,
-		OnExit:      m.persist,
+		OnExit:      m.onProcessExit,
 	})
 	if err != nil {
 		return Task{}, fmt.Errorf("启动 %s: %w", m.cfg.CLIPath, err)
@@ -215,10 +272,11 @@ func (m *Manager) Restart(id string) (Task, error) {
 		Name:        prev.Name,
 		RemotePath:  prev.RemotePath,
 		SaveDir:     m.cfg.SaveRoot,
+		IsDir:       prev.IsDir,
 		CLIPath:     m.cfg.CLIPath,
 		Args:        prev.Args,
 		BufferBytes: m.cfg.OutputBufferBytes,
-		OnExit:      m.persist,
+		OnExit:      m.onProcessExit,
 	})
 	if err != nil {
 		return Task{}, fmt.Errorf("启动 %s: %w", m.cfg.CLIPath, err)

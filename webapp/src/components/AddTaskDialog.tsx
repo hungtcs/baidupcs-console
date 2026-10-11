@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { LuCloudDownload, LuX } from 'react-icons/lu'
 import { toErrorMessage } from '../api'
 import { Browser } from './Browser'
 import { Modal } from './Modal'
@@ -46,6 +47,7 @@ export function AddTaskDialog({ onClose, onCreate, onCreated }: AddTaskDialogPro
           </div>
           <div className="footer-actions">
             <button type="button" className="btn btn-ghost" onClick={onClose}>
+              <LuX aria-hidden="true" />
               取消
             </button>
             <button
@@ -54,7 +56,14 @@ export function AddTaskDialog({ onClose, onCreate, onCreated }: AddTaskDialogPro
               onClick={() => void submit()}
               disabled={submitting || selected.trim() === ''}
             >
-              {submitting ? '创建中…' : '开始下载'}
+              {submitting ? (
+                '创建中…'
+              ) : (
+                <>
+                  <LuCloudDownload aria-hidden="true" />
+                  开始下载
+                </>
+              )}
             </button>
           </div>
         </>

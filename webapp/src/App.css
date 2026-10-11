@@ -90,17 +90,96 @@
   white-space: nowrap;
 }
 
-.task-row-meta {
+.task-row-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+/* 图标按扩展名变化，所以尺寸要固定，避免不同图标把行高撑得不一样 */
+.task-row-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: var(--text-faint);
+}
+
+.task-row-icon.is-dir {
+  color: var(--warn);
+}
+
+.task-row-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-row-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-}
-
-.task-row-time {
   font-size: 11px;
   color: var(--text-faint);
   white-space: nowrap;
+}
+
+.task-row-tag {
+  font-size: 11px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+/* 列表里的迷你进度条 */
+
+.task-row-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.task-row-track {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--bg-elev-2);
+  overflow: hidden;
+}
+
+.task-row-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+  transition: width 0.4s ease;
+}
+
+.task-row-fill.is-done {
+  background: var(--success);
+}
+
+.task-row-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.task-row-percent {
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.task-row-bytes {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.task-row-speed {
+  color: var(--accent);
+  margin-left: auto;
 }
 
 .task-list-empty {
@@ -122,11 +201,9 @@
   flex-shrink: 0;
 }
 
-.status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
+.badge-icon {
+  width: 11px;
+  height: 11px;
   flex-shrink: 0;
 }
 
@@ -136,8 +213,8 @@
   border-color: rgba(52, 211, 153, 0.3);
 }
 
-.badge-running .status-dot {
-  animation: pulse 1.2s ease-in-out infinite;
+.badge-running .badge-icon {
+  animation: spin 1.1s linear infinite;
 }
 
 .badge-exited {
@@ -170,17 +247,6 @@
   flex: 1;
   min-width: 0;
   min-height: 0;
-}
-
-.workspace-empty {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 20px;
-  color: var(--text-dim);
 }
 
 .toolbar {
@@ -218,23 +284,19 @@
   white-space: nowrap;
 }
 
-.term-state-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--text-faint);
+.term-state > svg {
+  width: 13px;
+  height: 13px;
   flex-shrink: 0;
 }
 
-.term-open .term-state-dot {
-  background: var(--success);
-  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.18);
+.term-open {
+  color: var(--success);
 }
 
-.term-connecting .term-state-dot,
-.term-reconnecting .term-state-dot {
-  background: var(--warn);
-  animation: pulse 1.2s ease-in-out infinite;
+.term-connecting,
+.term-reconnecting {
+  color: var(--warn);
 }
 
 /* 终端 */
@@ -419,6 +481,9 @@
 }
 
 .crumb-sep {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
   color: var(--text-faint);
 }
 
@@ -594,6 +659,74 @@
   color: var(--text-faint);
 }
 
+/* --------------------------- 终端上方的进度条 --------------------------- */
+
+.progress {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+
+.progress-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-elev-2);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--info));
+  /* 后端每秒推一次，这里补一个过渡，避免进度条一格一格地跳 */
+  transition: width 0.4s ease;
+}
+
+.progress.is-done .progress-fill {
+  background: linear-gradient(90deg, var(--success), #10b981);
+}
+
+.progress-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin-top: 7px;
+  font-size: 12px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-percent {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.progress-bytes {
+  color: var(--text);
+}
+
+.progress-speed {
+  color: var(--accent);
+}
+
+.progress-files,
+.progress-current {
+  color: var(--text-faint);
+}
+
+/* 目录下载时当前文件名可能很长，截断而不是把整行撑开 */
+.progress-current {
+  max-width: 22em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progress-finished {
+  color: var(--success);
+}
+
 /* -------------------------------- 响应式 -------------------------------- */
 
 @media (max-width: 720px) {
@@ -604,4 +737,444 @@
   .command-line {
     display: none;
   }
+}
+
+
+/* ------------------------------ 图标与动效 ------------------------------ */
+
+/* 旋转动画：运行中的任务、加载中、重连中都用它 */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.is-spin {
+  animation: spin 1.1s linear infinite;
+}
+
+/* 空状态的大图标 */
+.empty-icon {
+  width: 34px;
+  height: 34px;
+  margin-bottom: 10px;
+  color: var(--text-faint);
+  opacity: 0.75;
+}
+
+/* 侧栏标题与计数 */
+.sidebar-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.sidebar-title > svg {
+  width: 16px;
+  height: 16px;
+  color: var(--accent);
+}
+
+.sidebar-count {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--bg-elev-2);
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.sidebar-foot {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.sidebar-foot > svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* 进度状态栏里带图标的统计项 */
+.progress-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.progress-stat > svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+
+/* -------------------------------- 概览页 -------------------------------- */
+
+/* 没选中任务时右侧显示的页面，取代了原来的空状态。 */
+.overview {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.overview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 11px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+
+.overview-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+}
+
+.overview-title > svg {
+  width: 17px;
+  height: 17px;
+  color: var(--accent);
+}
+
+.overview-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 24px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+/* 统计卡片 */
+
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 12px;
+}
+
+.stat-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 1px 11px;
+  padding: 13px 15px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+
+.stat-icon {
+  grid-row: 1 / 3;
+  display: flex;
+  color: var(--text-faint);
+}
+
+.stat-icon > svg {
+  width: 19px;
+  height: 19px;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 650;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.stat-card.is-running .stat-icon,
+.stat-card.is-running .stat-value {
+  color: var(--success);
+}
+
+.stat-card.is-stopped .stat-icon {
+  color: var(--warn);
+}
+
+/* 小节 */
+
+.overview-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.overview-section-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.overview-section-title > svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.overview-badge {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-hint {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-faint);
+}
+
+/* 正在下载 */
+
+.overview-running {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.overview-running-row {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text);
+  text-align: left;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.overview-running-row:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.overview-running-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.overview-running-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: var(--text-faint);
+}
+
+.overview-running-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.overview-running-speed {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-running-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg-elev-2);
+  overflow: hidden;
+}
+
+.overview-running-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--accent), var(--info));
+  transition: width 0.4s ease;
+}
+
+.overview-running-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-running-percent {
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+/* 运行环境 */
+
+.env-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin: 0;
+}
+
+.env-item {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.env-item dt {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 96px;
+  flex-shrink: 0;
+  color: var(--text-faint);
+}
+
+.env-item dt > svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.env-item dd {
+  margin: 0;
+  min-width: 0;
+}
+
+.env-item code {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  word-break: break-all;
+}
+
+
+/* ---------------------------- 侧栏的概览入口 ---------------------------- */
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 6px;
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.nav-item:hover {
+  background: var(--bg-hover);
+}
+
+.nav-item.is-active {
+  background: var(--accent-soft);
+  border-color: rgba(77, 141, 255, 0.4);
+  color: var(--text);
+}
+
+.nav-item > svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+/* ------------------------------ 速度曲线图 ------------------------------ */
+
+.speed-chart {
+  padding: 0 14px 4px;
+  /* uPlot 会自己往 canvas 上画，这里只管给个容器尺寸 */
+}
+
+.speed-chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 14px 4px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border);
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+/* uPlot 自带的图例/提示都关掉了，只需要压掉它的默认边框色 */
+.speed-chart .u-over {
+  background: transparent;
+}
+
+/* ------------------------- 没有输出时的终端占位 ------------------------- */
+
+.terminal-pane {
+  /* 空状态要盖在隐藏的终端之上 */
+  position: relative;
+}
+
+/* 隐藏而不是移除：FitAddon 要能量到尺寸，display:none 会让它量到 0。
+   容器一直在，切回来时不用重建终端。 */
+.terminal-host.is-hidden {
+  visibility: hidden;
+}
+
+.terminal-empty {
+  position: absolute;
+  inset: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 20px;
+  border-radius: var(--radius);
+  border: 1px dashed var(--border);
+  background: var(--bg-elev);
+  text-align: center;
+}
+
+.terminal-empty .empty-hint {
+  max-width: 42em;
+}
+
+/* 小节标题右边的补充说明 */
+.overview-section-note {
+  margin-left: 4px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-faint);
 }

@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
+import { LuX } from 'react-icons/lu'
 
 interface ModalProps {
   title: string
@@ -30,7 +31,7 @@ export function Modal({ title, onClose, children, footer, wide = false }: ModalP
         <header className="modal-header">
           <h2>{title}</h2>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="关闭">
-            ×
+            <LuX aria-hidden="true" />
           </button>
         </header>
         <div className="modal-body">{children}</div>

@@ -8,6 +8,8 @@ import {
   toErrorMessage,
 } from './api'
 import type { Task } from './api'
+import { appendSpeed, EMPTY_SPEED, totalSpeed } from './speedSeries'
+import type { SpeedSeries } from './speedSeries'
 
 /** 列表轮询间隔：后端没有推送，2 秒拉一次。 */
 const POLL_INTERVAL = 2000
@@ -19,7 +21,15 @@ const POLL_INTERVAL = 2000
 function signature(list: Task[]): string {
   let out = ''
   for (const task of list) {
-    out += `${task.id}\u0000${task.status}\u0000${task.pid}\u0000${task.exitCode}\u0000${task.finishedAt ?? ''}\u0001`
+    const prog = task.progress
+    out +=
+      `${task.id}\u0000${task.status}\u0000${task.pid}\u0000${task.exitCode}\u0000${task.finishedAt ?? ''}` +
+      // startedAt 是「这一轮运行」的标识：重启后它变了，终端据此重连。
+      `\u0000${task.startedAt}` +
+      `\u0000${task.resumable ? '1' : '0'}` +
+      // 进度要参与签名，否则列表里的进度条永远不会更新。
+      `\u0000${prog ? `${prog.doneText}|${prog.speedText}|${prog.percent}|${prog.filesDone}` : ''}` +
+      '\u0001'
   }
   return out
 }
@@ -31,6 +41,8 @@ export interface UseTasksResult {
   dismissError: () => void
   /** 最近一次轮询失败的原因；成功时清空 */
   pollError: string | null
+  /** 合计速度曲线（所有运行中任务之和）。前端自己攒的，刷新页面后从头开始。 */
+  speedSeries: SpeedSeries
   refresh: () => Promise<void>
   create: (remotePath: string) => Promise<Task>
   kill: (id: string) => Promise<void>
@@ -42,6 +54,7 @@ export function useTasks(): UseTasksResult {
   const [tasks, setTasks] = useState<Task[]>([])
   const [error, setError] = useState<string | null>(null)
   const [pollError, setPollError] = useState<string | null>(null)
+  const [speedSeries, setSpeedSeries] = useState<SpeedSeries>(EMPTY_SPEED)
 
   const tasksRef = useRef<Task[]>([])
   const sigRef = useRef<string>('')
@@ -55,15 +68,22 @@ export function useTasks(): UseTasksResult {
     setTasks(list)
   }, [])
 
+  // 合计速度只能在轮询拿到新数据时采一次样：后端没有「所有任务总和」这种东西，
+  // 而列表本来就是每 2 秒轮一次，所以这条曲线也是大约 2 秒一个点。
+  const recordSpeed = useCallback((list: Task[]) => {
+    setSpeedSeries((prev) => appendSpeed(prev, Date.now(), totalSpeed(list)))
+  }, [])
+
   const refresh = useCallback(async () => {
     try {
       const list = await getTasks()
       commit(list)
+      recordSpeed(list)
       setPollError(null)
     } catch (err) {
       setPollError(toErrorMessage(err))
     }
-  }, [commit])
+  }, [commit, recordSpeed])
 
   useEffect(() => {
     let alive = true
@@ -72,6 +92,7 @@ export function useTasks(): UseTasksResult {
         const list = await getTasks()
         if (!alive) return
         commit(list)
+        recordSpeed(list)
         setPollError(null)
       } catch (err) {
         if (!alive) return
@@ -85,7 +106,7 @@ export function useTasks(): UseTasksResult {
       alive = false
       window.clearInterval(timer)
     }
-  }, [commit])
+  }, [commit, recordSpeed])
 
   /** 把一次操作失败转成 Toast 文案。 */
   const run = useCallback(async (action: () => Promise<void>) => {
@@ -137,5 +158,16 @@ export function useTasks(): UseTasksResult {
 
   const dismissError = useCallback(() => setError(null), [])
 
-  return { tasks, error, dismissError, pollError, refresh, create, kill, restart, remove }
+  return {
+    tasks,
+    error,
+    dismissError,
+    pollError,
+    speedSeries,
+    refresh,
+    create,
+    kill,
+    restart,
+    remove,
+  }
 }

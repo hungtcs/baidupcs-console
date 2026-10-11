@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
+import { LuChevronRight, LuCornerLeftUp } from 'react-icons/lu'
 import { browse, toErrorMessage } from '../api'
 import type { BrowseResult } from '../api'
+import { renderFileIcon } from '../fileIcon'
 
 interface BrowserProps {
   selected: string
@@ -27,30 +29,6 @@ function buildCrumbs(path: string): Crumb[] {
     crumbs.push({ label: segment, path: acc })
   }
   return crumbs
-}
-
-function FolderIcon() {
-  return (
-    <svg className="entry-icon" viewBox="0 0 16 16" aria-hidden="true">
-      <path
-        d="M1.5 3.5h4l1.2 1.6h7.8v7.4a1 1 0 0 1-1 1H2.5a1 1 0 0 1-1-1z"
-        fill="currentColor"
-        opacity="0.85"
-      />
-    </svg>
-  )
-}
-
-function FileIcon() {
-  return (
-    <svg className="entry-icon" viewBox="0 0 16 16" aria-hidden="true">
-      <path
-        d="M3.5 1.5h6l3 3v10a1 1 0 0 1-1 1h-8a1 1 0 0 1-1-1v-12a1 1 0 0 1 1-1z"
-        fill="currentColor"
-        opacity="0.7"
-      />
-    </svg>
-  )
 }
 
 /** 网盘浏览器：面包屑 + 目录浏览，点目录进入，点文件选中。 */
@@ -91,7 +69,7 @@ export function Browser({ selected, onSelect }: BrowserProps) {
       <div className="browser-crumbs">
         {crumbs.map((crumb, index) => (
           <span key={crumb.path} className="crumb-item">
-            {index > 0 && <span className="crumb-sep">/</span>}
+            {index > 0 && <LuChevronRight className="crumb-sep" aria-hidden="true" />}
             <button
               type="button"
               className="crumb"
@@ -112,7 +90,7 @@ export function Browser({ selected, onSelect }: BrowserProps) {
             {showParent && (
               <div className="browser-row parent-row">
                 <button type="button" className="entry-name" onClick={() => setPath(data.parent)}>
-                  <span className="entry-icon entry-up">↑</span>
+                  <LuCornerLeftUp className="entry-icon" aria-hidden="true" />
                   <span className="entry-label">返回上级</span>
                 </button>
               </div>
@@ -135,7 +113,7 @@ export function Browser({ selected, onSelect }: BrowserProps) {
                   onClick={() => (entry.isDir ? setPath(entry.path) : onSelect(entry.path))}
                   title={entry.path}
                 >
-                  {entry.isDir ? <FolderIcon /> : <FileIcon />}
+                  {renderFileIcon(entry.name, entry.isDir, 'entry-icon')}
                   <span className="entry-label">{entry.name}</span>
                 </button>
                 {/* 直接用 CLI 的原样文本，保证与 `BaiduPCS-Go ls` 显示一致 */}
