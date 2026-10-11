@@ -7,11 +7,12 @@ function clampPercent(value: number): number {
 }
 
 /**
- * 终端上方的下载进度状态栏。
+ * 终端上方的进度读数。
  *
- * 数据是后端从 CLI 输出里解析出来的，每秒从终端 WebSocket 推过来，所以它和下面的
- * 终端内容说的是同一件事，只是把关键数字拎出来了。数字一律用 CLI 的原样文本，
- * 不做二次格式化，保证和终端里看到的一致。
+ * 这是整个界面里唯一「用力」的地方：百分比用大号等宽数字立在最前面，下面是贯穿
+ * 整幅宽度的进度尺，再往下才是细节。为的是隔着一米、或拿在手上瞟一眼就能读到。
+ *
+ * 数字一律用 CLI 的原样文本，不做二次格式化，保证和下面的终端里看到的一致。
  *
  * 目录下载时 CLI 逐文件打印、事先不告诉目录总大小，所以百分比是「当前文件」的，
  * 另外用「已完成 N 个文件」和「当前 xxx」补充说明。
@@ -25,6 +26,15 @@ export function ProgressBar({ progress }: { progress: Progress }) {
 
   return (
     <div className={progress.finished ? 'progress is-done' : 'progress'}>
+      <div className="progress-readout">
+        {known && <span className="progress-percent">{percent.toFixed(1)}%</span>}
+        <span className="progress-bytes">
+          {progress.doneText}
+          <span className="progress-bytes-sep">/</span>
+          {progress.totalText}
+        </span>
+      </div>
+
       <div
         className="progress-track"
         role="progressbar"
@@ -37,12 +47,6 @@ export function ProgressBar({ progress }: { progress: Progress }) {
       </div>
 
       <div className="progress-meta">
-        {known && <span className="progress-percent">{percent.toFixed(1)}%</span>}
-
-        <span className="progress-bytes">
-          {progress.doneText} / {progress.totalText}
-        </span>
-
         {progress.speedText !== '' && (
           <span className="progress-stat">
             <LuGauge aria-hidden="true" />
@@ -62,13 +66,9 @@ export function ProgressBar({ progress }: { progress: Progress }) {
           </span>
         )}
 
-        {multiFile && (
-          <span className="progress-stat progress-files">
-            已完成 {progress.filesDone} 个文件
-          </span>
-        )}
+        {multiFile && <span className="progress-stat">已完成 {progress.filesDone} 个文件</span>}
         {multiFile && progress.currentName !== '' && (
-          <span className="progress-current" title={progress.currentName}>
+          <span className="progress-stat progress-current" title={progress.currentName}>
             当前 {progress.currentName}
           </span>
         )}

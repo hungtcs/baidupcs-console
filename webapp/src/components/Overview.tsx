@@ -1,17 +1,5 @@
 import { useEffect, useState } from 'react'
-import {
-  LuCircleStop,
-  LuCloudDownload,
-  LuFolderOpen,
-  LuGauge,
-  LuLayoutDashboard,
-  LuLoaderCircle,
-  LuMonitorCog,
-  LuPlus,
-  LuServer,
-  LuSquare,
-} from 'react-icons/lu'
-import type { IconType } from 'react-icons'
+import { LuArrowLeft, LuCloudDownload, LuFolderOpen, LuMonitorCog } from 'react-icons/lu'
 import { getHealth, toErrorMessage } from '../api'
 import type { Health, Task } from '../api'
 import { renderFileIcon } from '../fileIcon'
@@ -22,10 +10,11 @@ import { SpeedChart } from './SpeedChart'
 
 interface OverviewProps {
   tasks: Task[]
+  /** 窄屏下点返回回到任务列表；桌面端不显示这个按钮 */
+  onBack: () => void
   /** 合计速度曲线，由 useTasks 在轮询时采样 */
   speedSeries: SpeedSeries
   onSelect: (id: string) => void
-  onNewTask: () => void
 }
 
 function clampPercent(value: number): number {
@@ -39,7 +28,7 @@ function clampPercent(value: number): number {
  * 只展示已有数据，不额外请求任务列表（那份数据 App 已经拿着了）；运行环境那一栏
  * 来自 `GET /api/health`，所以在组件里单独拉一次。
  */
-export function Overview({ tasks, speedSeries, onSelect, onNewTask }: OverviewProps) {
+export function Overview({ tasks, speedSeries, onSelect, onBack }: OverviewProps) {
   const running = tasks.filter((task) => task.status === 'running')
   const stopped = tasks.filter((task) => task.status === 'killed')
   const finished = tasks.filter((task) => task.status === 'exited')
@@ -50,30 +39,29 @@ export function Overview({ tasks, speedSeries, onSelect, onNewTask }: OverviewPr
   return (
     <div className="overview">
       <header className="overview-header">
-        <h2 className="overview-title">
-          <LuLayoutDashboard aria-hidden="true" />
-          概览
-        </h2>
-        <button type="button" className="btn btn-primary btn-sm" onClick={onNewTask}>
-          <LuPlus aria-hidden="true" />
-          新建下载
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm back-btn"
+          onClick={onBack}
+          aria-label="返回任务列表"
+        >
+          <LuArrowLeft aria-hidden="true" />
         </button>
+
+        <h2 className="overview-title">概览</h2>
       </header>
 
       <div className="overview-body">
         <section className="stat-row">
-          <StatCard icon={LuCloudDownload} label="任务总数" value={String(tasks.length)} />
+          <StatCard label="任务总数" value={String(tasks.length)} />
           <StatCard
-            icon={LuLoaderCircle}
             label="下载中"
             value={String(running.length)}
             tone={running.length > 0 ? 'running' : undefined}
-            spin={running.length > 0}
           />
-          <StatCard icon={LuSquare} label="已停止" value={String(stopped.length)} tone="stopped" />
-          <StatCard icon={LuCircleStop} label="已结束" value={String(finished.length)} />
+          <StatCard label="已停止" value={String(stopped.length)} tone="stopped" />
+          <StatCard label="已结束" value={String(finished.length)} />
           <StatCard
-            icon={LuGauge}
             label="合计速度"
             value={formatSpeed(speed)}
             tone={speed > 0 ? 'running' : undefined}
@@ -82,7 +70,6 @@ export function Overview({ tasks, speedSeries, onSelect, onNewTask }: OverviewPr
 
         <section className="overview-section">
           <h3 className="overview-section-title">
-            <LuLoaderCircle aria-hidden="true" />
             正在下载
             {running.length > 0 && <span className="overview-badge">{running.length}</span>}
           </h3>
@@ -90,7 +77,7 @@ export function Overview({ tasks, speedSeries, onSelect, onNewTask }: OverviewPr
           {running.length === 0 ? (
             <p className="overview-hint">
               {tasks.length === 0
-                ? '还没有任何任务。点右上角「新建下载」从网盘选文件。'
+                ? '还没有任何任务。点左侧的「＋ 新建下载」从网盘选文件。'
                 : '当前没有正在下载的任务。从左侧选一个任务查看它的终端输出，或点「继续」重新开始。'}
             </p>
           ) : (
@@ -104,7 +91,6 @@ export function Overview({ tasks, speedSeries, onSelect, onNewTask }: OverviewPr
 
         <section className="overview-section">
           <h3 className="overview-section-title">
-            <LuGauge aria-hidden="true" />
             合计速度
             <span className="overview-section-note">最近 5 分钟 · 所有运行中任务之和</span>
           </h3>
@@ -117,28 +103,26 @@ export function Overview({ tasks, speedSeries, onSelect, onNewTask }: OverviewPr
   )
 }
 
-/** 一张统计卡片。 */
+/**
+ * 一项统计。
+ *
+ * 刻意不放图标：数字加标签已经把话说完了，再配个图标只是噪声。图标留给
+ * 需要它区分类型的地方（文件类型、状态、动作按钮）。
+ */
 function StatCard({
-  icon: Icon,
   label,
   value,
   tone,
-  spin = false,
 }: {
-  icon: IconType
   label: string
   value: string
   tone?: 'running' | 'stopped'
-  spin?: boolean
 }) {
   const classes = ['stat-card']
   if (tone !== undefined) classes.push(`is-${tone}`)
 
   return (
     <div className={classes.join(' ')}>
-      <span className="stat-icon">
-        <Icon className={spin ? 'is-spin' : undefined} aria-hidden="true" />
-      </span>
       <span className="stat-value">{value}</span>
       <span className="stat-label">{label}</span>
     </div>
@@ -207,10 +191,7 @@ function EnvironmentSection() {
 
   return (
     <section className="overview-section">
-      <h3 className="overview-section-title">
-        <LuServer aria-hidden="true" />
-        运行环境
-      </h3>
+      <h3 className="overview-section-title">运行环境</h3>
 
       {error !== null ? (
         <p className="overview-hint">读取失败：{error}</p>

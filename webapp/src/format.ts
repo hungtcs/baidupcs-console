@@ -43,3 +43,21 @@ export function formatSpeed(bytesPerSecond: number): string {
   return `${value.toFixed(digits)}${SPEED_UNITS[unit]}/s`
 }
 
+
+/**
+ * 把毫秒数格式化成人话：`12 秒` / `2 分 14 秒` / `1 小时 3 分`。
+ *
+ * 只用于我们自己算出来的时长（任务的运行时长）。CLI 报的耗时一律直接显示它的原样文本。
+ */
+export function formatDuration(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return '—'
+
+  const total = Math.floor(ms / 1000)
+  const hours = Math.floor(total / 3600)
+  const minutes = Math.floor((total % 3600) / 60)
+  const seconds = total % 60
+
+  if (hours > 0) return `${hours} 小时 ${minutes} 分`
+  if (minutes > 0) return `${minutes} 分 ${seconds} 秒`
+  return `${seconds} 秒`
+}

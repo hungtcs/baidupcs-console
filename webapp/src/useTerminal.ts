@@ -80,10 +80,11 @@ export function useTerminal(taskId: string | null, runId: string | null): UseTer
       lineHeight: 1.25,
       scrollback: 10_000,
       theme: {
+        // 和 index.css 的 --ink-0 / --fg-2 对齐，终端是全局最深的一层
         background: '#0a0d12',
         foreground: '#c8d3e2',
-        cursor: '#4d8dff',
-        selectionBackground: 'rgba(77, 141, 255, 0.3)',
+        cursor: '#35b8e0',
+        selectionBackground: 'rgba(53, 184, 224, 0.28)',
         black: '#0a0d12',
         red: '#f87171',
         green: '#34d399',

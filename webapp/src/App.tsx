@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  LuArrowLeft,
+  LuChevronDown,
+  LuChevronUp,
   LuCircleStop,
-  LuDownload,
   LuLayoutDashboard,
   LuLoaderCircle,
   LuPlus,
@@ -15,6 +17,7 @@ import type { IconType } from 'react-icons'
 import { AddTaskDialog } from './components/AddTaskDialog'
 import { Overview } from './components/Overview'
 import { ProgressBar } from './components/ProgressBar'
+import { TaskInfo } from './components/TaskInfo'
 import { SpeedChart } from './components/SpeedChart'
 import { TaskList } from './components/TaskList'
 import { Toast } from './components/Toast'
@@ -43,6 +46,11 @@ function App() {
     useTasks()
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  // 窄屏下侧栏和工作区是两个互斥的全屏视图，这个字段决定显示哪个。
+  // 桌面端两栏并排，它不起作用。
+  const [pane, setPane] = useState<'list' | 'detail'>('list')
+  // 终端退到页面底部，默认只占一小块，需要细看时再展开
+  const [expanded, setExpanded] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [toast, setToast] = useState<ToastState | null>(null)
   const toastId = useRef(0)
@@ -69,6 +77,18 @@ function App() {
 
   const closeToast = useCallback(() => setToast(null), [])
 
+  // 窄屏下选中任务或概览就切到「工作区」这一屏；桌面端两栏并排，pane 不起作用。
+  const openTask = useCallback((id: string) => {
+    setSelectedId(id)
+    setPane('detail')
+    setExpanded(false)
+  }, [])
+
+  const openOverview = useCallback(() => {
+    setSelectedId(null)
+    setPane('detail')
+  }, [])
+
   // 操作失败统一转成轻提示。
   useEffect(() => {
     if (error !== null) {
@@ -80,10 +100,10 @@ function App() {
   const handleCreate = useCallback(
     async (remotePath: string) => {
       const task = await create(remotePath)
-      setSelectedId(task.id)
+      openTask(task.id)
       return task
     },
-    [create],
+    [create, openTask],
   )
 
   const handleDelete = useCallback(
@@ -103,11 +123,10 @@ function App() {
   const TerminalStateIcon = terminalInfo.Icon
 
   return (
-    <div className="app">
+    <div className="app" data-pane={pane}>
       <aside className="sidebar">
         <header className="sidebar-header">
           <h1 className="sidebar-title">
-            <LuDownload aria-hidden="true" />
             任务
             {tasks.length > 0 && <span className="sidebar-count">{tasks.length}</span>}
           </h1>
@@ -126,13 +145,13 @@ function App() {
           <button
             type="button"
             className={selectedId === null ? 'nav-item is-active' : 'nav-item'}
-            onClick={() => setSelectedId(null)}
+            onClick={openOverview}
           >
             <LuLayoutDashboard aria-hidden="true" />
             概览
           </button>
 
-          <TaskList tasks={listTasks} selectedId={selectedId} onSelect={setSelectedId} />
+          <TaskList tasks={listTasks} selectedId={selectedId} onSelect={openTask} />
         </div>
 
         {pollError !== null && (
@@ -143,20 +162,29 @@ function App() {
         )}
       </aside>
 
-      <main className="workspace">
+      <main className={expanded && selectedTask !== undefined ? 'workspace is-dock-open' : 'workspace'}>
         {selectedTask === undefined ? (
           <Overview
             tasks={tasks}
             speedSeries={speedSeries}
-            onSelect={setSelectedId}
-            onNewTask={() => setShowAdd(true)}
+            onSelect={openTask}
+            onBack={() => setPane('list')}
           />
         ) : (
           <>
             <header className="toolbar">
-              <code className="command-line" title={selectedTask.commandLine}>
-                {selectedTask.commandLine}
-              </code>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm back-btn"
+                onClick={() => setPane('list')}
+                aria-label="返回任务列表"
+              >
+                <LuArrowLeft aria-hidden="true" />
+              </button>
+
+              <h2 className="task-title" title={selectedTask.name}>
+                {selectedTask.name}
+              </h2>
 
               <div className="toolbar-actions">
                 {selectedTask.status === 'running' ? (
@@ -199,15 +227,6 @@ function App() {
                 </button>
               </div>
 
-              {terminalInfo.text !== '' && (
-                <span className={`term-state term-${terminalState}`}>
-                  <TerminalStateIcon
-                    className={terminalInfo.spin === true ? 'is-spin' : undefined}
-                    aria-hidden="true"
-                  />
-                  {terminalInfo.text}
-                </span>
-              )}
             </header>
 
             {/* 后端从终端输出里解析出来的进度；还没解析到就不显示这一条 */}
@@ -215,25 +234,75 @@ function App() {
 
             <SpeedChart times={speed.times} speeds={speed.speeds} />
 
-            <div className="terminal-pane">
-              {/* 容器始终挂载（ref 要一直在），没输出时只是隐藏，避免白占一块黑窗口。
-                  visibility 而不是 display，因为 FitAddon 需要能量到尺寸。 */}
-              <div
-                className={showTerminal ? 'terminal-host' : 'terminal-host is-hidden'}
-                ref={containerRef}
-              />
-
-              {!showTerminal && (
-                <div className="terminal-empty">
-                  <LuTerminal className="empty-icon" aria-hidden="true" />
-                  <p className="empty-title">没有终端输出</p>
-                  <p className="empty-hint">
-                    这次运行没有产生任何输出。服务重启后恢复的任务不会保留上次的输出，
-                    点「继续」重新开始就能看到新的。
-                  </p>
-                </div>
-              )}
+            {/* 主体是任务信息，终端退到底部一块，可展开 */}
+            <div className="detail-body">
+              <TaskInfo task={selectedTask} />
             </div>
+
+            {/* 展开时压一层遮罩，把注意力收到终端上；点它就收起 */}
+            {expanded && (
+              <button
+                type="button"
+                className="terminal-sheet-backdrop"
+                onClick={() => setExpanded(false)}
+                aria-label="收起终端输出"
+                // 收起终端有把手那个按钮就够了，这层不必进 Tab 序列
+                tabIndex={-1}
+              />
+            )}
+
+            <section className={expanded ? 'terminal-sheet is-open' : 'terminal-sheet'}>
+              {/* 整条把手都是点击目标，不用非得戳到按钮上 */}
+              <button
+                type="button"
+                className="terminal-sheet-handle"
+                onClick={() => setExpanded((v) => !v)}
+                aria-expanded={expanded}
+                aria-controls="terminal-sheet-body"
+              >
+                <span className="terminal-sheet-grip" aria-hidden="true" />
+                <span className="panel-title">终端输出</span>
+
+                {terminalInfo.text !== '' && (
+                  <span className={`term-state term-${terminalState}`}>
+                    <TerminalStateIcon
+                      className={terminalInfo.spin === true ? 'is-spin' : undefined}
+                      aria-hidden="true"
+                    />
+                    {terminalInfo.text}
+                  </span>
+                )}
+
+                <span className="terminal-sheet-hint">
+                  {expanded ? (
+                    <LuChevronDown aria-hidden="true" />
+                  ) : (
+                    <LuChevronUp aria-hidden="true" />
+                  )}
+                  {expanded ? '收起' : '展开'}
+                </span>
+              </button>
+
+              <div className="terminal-pane" id="terminal-sheet-body">
+                {/* 容器始终挂载（ref 要一直在），没输出时只是隐藏，避免白占一块黑窗口。
+                    visibility 而不是 display，因为 FitAddon 需要能量到尺寸。 */}
+                <div
+                  className={showTerminal ? 'terminal-host' : 'terminal-host is-hidden'}
+                  ref={containerRef}
+                />
+
+                {!showTerminal && (
+                  <div className="terminal-empty">
+                    <LuTerminal className="empty-icon" aria-hidden="true" />
+                    <p className="empty-title">没有终端输出</p>
+                    <p className="empty-hint">
+                      这次运行没有产生任何输出。服务重启后恢复的任务不会保留上次的输出，
+                      点「继续」重新开始就能看到新的。
+                    </p>
+                  </div>
+                )}
+              </div>
+            </section>
           </>
         )}
       </main>

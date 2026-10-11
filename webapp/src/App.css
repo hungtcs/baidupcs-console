@@ -1,117 +1,194 @@
-/* ------------------------------- 布局 ------------------------------- */
+/*
+ * 界面样式。
+ *
+ * 结构约定（改样式前先看这里）：
+ *   - 全站只有一层表面（--ink-1）。分区一律靠 1px 发丝线（--line），
+ *     不用卡片、不用阴影、不用渐变。唯一会浮起来的是模态和轻提示。
+ *   - 行与行之间用发丝线分隔，不把每一行做成一张圆角卡片。
+ *   - 颜色只在有含义的地方出现：--live 正在传、--hold 已停止、--done 已完成、
+ *     --bad 出错。其余全部走灰阶。
+ *   - 所有数据（百分比、大小、速度、时间、文件名、路径）用 --mono + tabular-nums。
+ *   - 移动端断点 860px：侧栏与右侧工作区变成两个互斥的全屏视图。
+ */
+
+/* -------------------------------- 整体骨架 -------------------------------- */
 
 .app {
   display: flex;
-  height: 100%;
+  height: 100dvh;
   overflow: hidden;
+  background: var(--ink-1);
 }
-
-/* ------------------------------- 左栏 ------------------------------- */
 
 .sidebar {
   display: flex;
   flex-direction: column;
+  width: 312px;
   flex-shrink: 0;
-  width: 320px;
-  min-height: 0;
-  border-right: 1px solid var(--border);
-  background: var(--bg-elev);
+  border-right: 1px solid var(--line);
+  background: var(--ink-1);
 }
 
 .sidebar-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 14px;
-  border-bottom: 1px solid var(--border);
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
 }
 
+/* 标题不做成「图标 + 文字 + 徽章」的模板组合：这里只需要说明这是什么 */
 .sidebar-title {
-  font-size: 15px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.sidebar-count {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--fg-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.sidebar-count::before {
+  content: '· ';
 }
 
 .sidebar-body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 8px;
+  padding: 8px 0 16px;
 }
 
 .sidebar-foot {
-  padding: 8px 14px;
-  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+  background: rgba(232, 97, 94, 0.08);
+  color: var(--bad);
   font-size: 12px;
-  color: var(--danger);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-/* 任务列表 */
+.sidebar-foot > svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* -------------------------------- 概览入口 -------------------------------- */
+
+/* 列表上方的常驻项，选中任务后靠它回到概览 */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  border-left: 2px solid transparent;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--fg-2);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.nav-item > svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.nav-item:hover {
+  background: var(--ink-2);
+  color: var(--fg);
+}
+
+.nav-item.is-active {
+  border-left-color: var(--live);
+  background: var(--ink-2);
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.nav-item.is-active > svg {
+  color: var(--live);
+}
+
+/* -------------------------------- 任务列表 -------------------------------- */
 
 .task-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
 }
 
+/* 每行是一条发丝线分隔的记录，不是一张卡片 */
 .task-row {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 7px;
+  gap: 8px;
   width: 100%;
-  padding: 9px 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid transparent;
+  padding: 11px 14px;
+  border: none;
+  border-left: 2px solid transparent;
+  border-bottom: 1px solid var(--line);
   background: transparent;
-  color: var(--text);
+  color: var(--fg);
   text-align: left;
+  cursor: pointer;
   transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease;
+    background-color 0.12s ease,
+    border-color 0.12s ease;
 }
 
 .task-row:hover {
-  background: var(--bg-hover);
+  background: var(--ink-2);
 }
 
 .task-row.is-selected {
-  background: var(--accent-soft);
-  border-color: rgba(77, 141, 255, 0.4);
-}
-
-.task-row-name {
-  font-size: 13px;
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  border-left-color: var(--live);
+  background: var(--ink-2);
 }
 
 .task-row-head {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   min-width: 0;
 }
 
-/* 图标按扩展名变化，所以尺寸要固定，避免不同图标把行高撑得不一样 */
 .task-row-icon {
   width: 15px;
   height: 15px;
   flex-shrink: 0;
-  color: var(--text-faint);
+  color: var(--fg-3);
 }
 
 .task-row-icon.is-dir {
-  color: var(--warn);
+  color: var(--hold);
 }
 
 .task-row-name {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 12.5px;
 }
 
 .task-row-foot {
@@ -119,57 +196,52 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  font-family: var(--mono);
   font-size: 11px;
-  color: var(--text-faint);
-  white-space: nowrap;
+  color: var(--fg-3);
+  font-variant-numeric: tabular-nums;
 }
 
 .task-row-tag {
-  font-size: 11px;
-  color: var(--text-faint);
-  white-space: nowrap;
+  color: var(--fg-3);
 }
 
-/* 列表里的迷你进度条 */
-
+/* 列表里的迷你进度条：短促一条，只表达「在动」 */
 .task-row-progress {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
 }
 
 .task-row-track {
-  height: 3px;
-  border-radius: 2px;
-  background: var(--bg-elev-2);
-  overflow: hidden;
+  height: 2px;
+  background: var(--ink-3);
 }
 
 .task-row-fill {
   height: 100%;
-  border-radius: 2px;
-  background: var(--accent);
-  transition: width 0.4s ease;
+  background: var(--live);
+  transition: width 0.3s ease;
 }
 
 .task-row-fill.is-done {
-  background: var(--success);
+  background: var(--done);
 }
 
 .task-row-stats {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  font-family: var(--mono);
   font-size: 11px;
-  color: var(--text-faint);
+  color: var(--fg-3);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  overflow: hidden;
 }
 
 .task-row-percent {
-  color: var(--text-dim);
-  font-weight: 600;
+  color: var(--fg-2);
 }
 
 .task-row-bytes {
@@ -178,27 +250,29 @@
 }
 
 .task-row-speed {
-  color: var(--accent);
   margin-left: auto;
+  color: var(--live);
 }
 
 .task-list-empty {
-  padding: 32px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 20px;
   text-align: center;
 }
 
-/* 状态徽章 */
+/* -------------------------------- 状态徽章 -------------------------------- */
 
+/* 徽章不填充底色：一处色点 + 文字就够，填充会和外层的进度色打架 */
 .badge {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  font-size: 11px;
-  font-weight: 600;
   flex-shrink: 0;
+  font-size: 11px;
+  color: var(--fg-3);
+  white-space: nowrap;
 }
 
 .badge-icon {
@@ -208,69 +282,60 @@
 }
 
 .badge-running {
-  color: var(--success);
-  background: rgba(52, 211, 153, 0.12);
-  border-color: rgba(52, 211, 153, 0.3);
-}
-
-.badge-running .badge-icon {
-  animation: spin 1.1s linear infinite;
+  color: var(--live);
 }
 
 .badge-exited {
-  color: var(--text-dim);
-  background: rgba(154, 166, 182, 0.12);
-  border-color: rgba(154, 166, 182, 0.25);
+  color: var(--fg-2);
 }
 
 .badge-killed {
-  color: var(--warn);
-  background: rgba(251, 191, 36, 0.12);
-  border-color: rgba(251, 191, 36, 0.3);
+  color: var(--hold);
 }
 
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.25;
-  }
-}
-
-/* ------------------------------- 右栏 ------------------------------- */
+/* --------------------------------- 工作区 --------------------------------- */
 
 .workspace {
+  position: relative; /* 终端抽屉相对它定位 */
   display: flex;
   flex-direction: column;
   flex: 1;
   min-width: 0;
   min-height: 0;
+  background: var(--ink-1);
 }
 
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-elev);
+  gap: 12px;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--line);
 }
 
-.command-line {
+/* 工具栏只放任务名。完整命令行是背景信息，挪到下面的任务信息里 */
+.task-title {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* 小节标题：任务信息 / 终端输出共用 */
+.panel-title {
   font-size: 12px;
-  color: var(--text-dim);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--fg-2);
 }
 
 .toolbar-actions {
   display: flex;
-  gap: 8px;
+  gap: 4px;
   flex-shrink: 0;
 }
 
@@ -279,8 +344,8 @@
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
-  font-size: 12px;
-  color: var(--text-faint);
+  font-size: 11px;
+  color: var(--fg-3);
   white-space: nowrap;
 }
 
@@ -291,517 +356,102 @@
 }
 
 .term-open {
-  color: var(--success);
+  color: var(--done);
 }
 
 .term-connecting,
 .term-reconnecting {
-  color: var(--warn);
+  color: var(--hold);
 }
 
-/* 终端 */
-
-.terminal-pane {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-  padding: 12px;
+/* 移动端的返回按钮，桌面端不出现 */
+.back-btn {
+  display: none;
 }
 
-/* 直接作为 .xterm 的父元素：不要 padding / border，FitAddon 会按这里的
-   计算尺寸算行列数，有内边距会导致溢出。 */
-.terminal-host {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  border-radius: var(--radius);
-  background: #0a0d12;
-  box-shadow: inset 0 0 0 1px var(--border);
-}
+/* ------------------------- 进度读数（本页面的重心） ------------------------- */
 
-/* ------------------------------- 模态框 ------------------------------- */
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: rgba(6, 9, 13, 0.68);
-  backdrop-filter: blur(3px);
-}
-
-.modal {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: 520px;
-  max-height: calc(100vh - 48px);
-  border-radius: 14px;
-  border: 1px solid var(--border-strong);
-  background: var(--bg-elev);
-  box-shadow: var(--shadow);
-  overflow: hidden;
-}
-
-.modal-wide {
-  max-width: 760px;
-}
-
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 15px 18px;
-  border-bottom: 1px solid var(--border);
-}
-
-.modal-header h2 {
-  font-size: 15px;
-}
-
-.modal-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 18px;
-}
-
-.modal-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 13px 18px;
-  border-top: 1px solid var(--border);
-  background: var(--bg-elev-2);
-}
-
-.footer-path {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.footer-path-label {
-  font-size: 12px;
-  color: var(--text-faint);
-  flex-shrink: 0;
-}
-
-.footer-path-value {
-  font-size: 12px;
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 420px;
-}
-
-.footer-actions {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-/* ------------------------------- 表单 ------------------------------- */
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 14px;
-}
-
-.field-label {
-  font-size: 12px;
-  color: var(--text-dim);
-}
-
-.form-error {
-  margin-top: 10px;
-  padding: 9px 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid rgba(248, 113, 113, 0.35);
-  background: rgba(248, 113, 113, 0.1);
-  color: var(--danger);
-  font-size: 12px;
-}
-
-/* ------------------------------ 网盘浏览器 ------------------------------ */
-
-.browser {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
-  overflow: hidden;
-}
-
-.browser-crumbs {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px;
-  padding: 9px 12px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-elev-2);
-  font-size: 12px;
-}
-
-.crumb-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.crumb {
-  padding: 2px 6px;
-  border: none;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--accent);
-  font-size: 12px;
-}
-
-.crumb:hover:not(:disabled) {
-  background: var(--accent-soft);
-}
-
-.crumb:disabled {
-  color: var(--text);
-  font-weight: 600;
-  cursor: default;
-}
-
-.crumb-sep {
-  width: 13px;
-  height: 13px;
-  flex-shrink: 0;
-  color: var(--text-faint);
-}
-
-.browser-list {
-  min-height: 240px;
-  max-height: 340px;
-  overflow-y: auto;
-}
-
-.browser-status {
-  padding: 26px 14px;
-  text-align: center;
-  color: var(--text-faint);
-  font-size: 13px;
-}
-
-.browser-error {
-  color: var(--danger);
-}
-
-.browser-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 12px;
-  border-bottom: 1px solid rgba(35, 43, 54, 0.55);
-}
-
-.browser-row:last-child {
-  border-bottom: none;
-}
-
-.browser-row:hover {
-  background: var(--bg-hover);
-}
-
-.browser-row.is-selected {
-  background: var(--accent-soft);
-}
-
-.entry-name {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  flex: 1;
-  min-width: 0;
-  padding: 5px 6px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text);
-  text-align: left;
-  font-size: 13px;
-}
-
-.entry-name:hover {
-  color: var(--accent);
-}
-
-.entry-icon {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-  color: var(--text-faint);
-}
-
-.is-dir .entry-icon {
-  color: var(--warn);
-}
-
-.entry-up {
-  font-size: 14px;
-  color: var(--text-dim);
-}
-
-.entry-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* 大小与修改日期都直接用 CLI 的原样文本，所以按固定宽度 + 等宽数字排成表格，
-   这样各行的列能像 `BaiduPCS-Go ls` 那样对齐。 */
-.entry-size {
-  font-size: 12px;
-  color: var(--text-faint);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  flex-shrink: 0;
-  min-width: 80px;
-  text-align: right;
-}
-
-.entry-mtime {
-  font-size: 12px;
-  color: var(--text-faint);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  flex-shrink: 0;
-  min-width: 140px;
-}
-
-.parent-row {
-  background: rgba(27, 34, 44, 0.5);
-}
-
-/* -------------------------------- 轻提示 -------------------------------- */
-
-.toast {
-  position: fixed;
-  right: 22px;
-  bottom: 22px;
-  z-index: 200;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  max-width: 420px;
-  padding: 11px 14px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border-strong);
-  background: var(--bg-elev-2);
-  box-shadow: var(--shadow);
-  font-size: 13px;
-  animation: toast-in 0.2s ease;
-}
-
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.toast-error {
-  border-color: rgba(248, 113, 113, 0.45);
-  color: #fecaca;
-}
-
-.toast-text {
-  flex: 1;
-}
-
-.toast-close {
-  border: none;
-  background: transparent;
-  color: inherit;
-  opacity: 0.6;
-  font-size: 16px;
-  line-height: 1;
-  padding: 0 2px;
-}
-
-.toast-close:hover {
-  opacity: 1;
-}
-
-/* -------------------------------- 空状态 -------------------------------- */
-
-.empty-title {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.empty-hint {
-  margin: 0;
-  font-size: 13px;
-  color: var(--text-faint);
-}
-
-/* --------------------------- 终端上方的进度条 --------------------------- */
-
+/*
+ * 这是整套界面里唯一「用力」的地方：百分比用大号等宽数字立在最前面，
+ * 下面是贯穿整幅宽度的进度尺，再下面才是细节。为的是隔着一米或
+ * 拿在手上瞟一眼就能读到。
+ */
 .progress {
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-elev);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 14px 13px;
+  border-bottom: 1px solid var(--line);
+}
+
+.progress-readout {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  min-width: 0;
+}
+
+.progress-percent {
+  font-family: var(--mono);
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+
+.progress.is-done .progress-percent {
+  color: var(--done);
+}
+
+.progress-bytes {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--fg-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-bytes-sep {
+  padding: 0 3px;
+  color: var(--fg-3);
 }
 
 .progress-track {
-  height: 6px;
-  border-radius: 3px;
-  background: var(--bg-elev-2);
-  overflow: hidden;
+  height: 4px;
+  background: var(--ink-3);
 }
 
 .progress-fill {
   height: 100%;
-  border-radius: 3px;
-  background: linear-gradient(90deg, var(--accent), var(--info));
-  /* 后端每秒推一次，这里补一个过渡，避免进度条一格一格地跳 */
-  transition: width 0.4s ease;
+  background: var(--live);
+  transition: width 0.3s ease;
 }
 
 .progress.is-done .progress-fill {
-  background: linear-gradient(90deg, var(--success), #10b981);
+  background: var(--done);
 }
 
 .progress-meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px 14px;
-  margin-top: 7px;
+  gap: 4px 16px;
+  font-family: var(--mono);
   font-size: 12px;
-  color: var(--text-dim);
+  color: var(--fg-3);
   font-variant-numeric: tabular-nums;
 }
 
-.progress-percent {
-  font-weight: 600;
-  color: var(--text);
-}
-
-.progress-bytes {
-  color: var(--text);
-}
-
-.progress-speed {
-  color: var(--accent);
-}
-
-.progress-files,
-.progress-current {
-  color: var(--text-faint);
-}
-
-/* 目录下载时当前文件名可能很长，截断而不是把整行撑开 */
-.progress-current {
-  max-width: 22em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.progress-finished {
-  color: var(--success);
-}
-
-/* -------------------------------- 响应式 -------------------------------- */
-
-@media (max-width: 720px) {
-  .sidebar {
-    width: 220px;
-  }
-
-  .command-line {
-    display: none;
-  }
-}
-
-
-/* ------------------------------ 图标与动效 ------------------------------ */
-
-/* 旋转动画：运行中的任务、加载中、重连中都用它 */
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.is-spin {
-  animation: spin 1.1s linear infinite;
-}
-
-/* 空状态的大图标 */
-.empty-icon {
-  width: 34px;
-  height: 34px;
-  margin-bottom: 10px;
-  color: var(--text-faint);
-  opacity: 0.75;
-}
-
-/* 侧栏标题与计数 */
-.sidebar-title {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.sidebar-title > svg {
-  width: 16px;
-  height: 16px;
-  color: var(--accent);
-}
-
-.sidebar-count {
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--bg-elev-2);
-  color: var(--text-faint);
-  font-size: 11px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.sidebar-foot {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.sidebar-foot > svg {
-  width: 14px;
-  height: 14px;
-  flex-shrink: 0;
-}
-
-/* 进度状态栏里带图标的统计项 */
 .progress-stat {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  white-space: nowrap;
 }
 
 .progress-stat > svg {
@@ -810,10 +460,286 @@
   flex-shrink: 0;
 }
 
+.progress-finished {
+  color: var(--done);
+}
 
-/* -------------------------------- 概览页 -------------------------------- */
+.progress-current {
+  max-width: 26em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
-/* 没选中任务时右侧显示的页面，取代了原来的空状态。 */
+/* ------------------------------- 速度曲线图 ------------------------------- */
+
+.speed-chart {
+  border-bottom: 1px solid var(--line);
+}
+
+.speed-chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid var(--line);
+  color: var(--fg-3);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+/* uPlot 自带一整圈背景，压掉，只留它画的网格与曲线 */
+.speed-chart .u-over,
+.speed-chart .u-under,
+.speed-chart .u-wrap {
+  background: transparent;
+}
+
+/* ------------------------------ 任务详情主体 ------------------------------ */
+
+/*
+ * 详情页的主体是任务信息，终端退到底部一小块（默认 38dvh，可展开）。
+ * 信息区自己滚动，终端高度固定，两者不抢地方。
+ */
+.detail-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: calc(var(--dock-handle) + var(--dock-gap) + 8px);
+  transition: padding-bottom 0.22s ease;
+}
+
+/* 浮层展开时锁住滚动——背后的东西已经压了遮罩，还能滚会让人分不清哪层在上。
+   这里不用再垫 padding：滚动都关了，垫高只会留出一片看不见的空白。 */
+.workspace.is-dock-open .detail-body {
+  overflow: hidden;
+}
+
+.task-info {
+  padding: 16px;
+}
+
+.task-info > .panel-title {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.task-info-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.task-info-row {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 14px;
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
+}
+
+.task-info-row:first-child {
+  border-top: none;
+}
+
+.task-info-key {
+  font-size: 12px;
+  color: var(--fg-3);
+}
+
+.task-info-value {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.task-info-text {
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--fg-2);
+  word-break: break-all;
+}
+
+.task-info-text code {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--fg);
+}
+
+/* 复制按钮平时收着，悬停或聚焦时才出现，别让一列按钮干扰阅读 */
+.task-info-copy {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--fg-3);
+  opacity: 0;
+  cursor: pointer;
+  transition:
+    opacity 0.12s ease,
+    color 0.12s ease;
+}
+
+.task-info-copy > svg {
+  width: 13px;
+  height: 13px;
+}
+
+.task-info-row:hover .task-info-copy,
+.task-info-copy:focus-visible {
+  opacity: 1;
+}
+
+.task-info-copy:hover {
+  color: var(--live);
+}
+
+/* --------------------------------- 终端 --------------------------------- */
+
+/*
+ * 终端是一块浮层：收起时只在底部露出一条悬浮的拉手，展开时整块浮上来盖住内容。
+ * 左右始终留出 dock-gap 的边，所以**宽度不变**——变化只走 transform，
+ * FitAddon 不会因为动画期间的宽度抖动而反复重算行列数。
+ *
+ * 另一个关键也是 transform：浮层始终拥有真实尺寸（只是被推到视口外），
+ * 所以任何状态下 FitAddon 都能量到正确的行列数，不用处理 0 尺寸的边界情况。
+ */
+.terminal-sheet {
+  position: absolute;
+  right: var(--dock-gap);
+  bottom: 0;
+  left: var(--dock-gap);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  height: var(--dock-height);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  background: var(--ink-0);
+  overflow: hidden;
+  transform: translateY(calc(100% - var(--dock-handle)));
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease;
+}
+
+/* 阴影只在浮上来之后加：收起时只剩一条把手，下面挂一圈阴影会很脏 */
+.terminal-sheet.is-open {
+  transform: translateY(calc(0px - var(--dock-gap)));
+  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.6);
+}
+
+/* 遮罩。用 button 而不是 div，这样点击语义和键盘可用性都是现成的 */
+.terminal-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 9; /* 浮层是 10，正好压在它上面 */
+  padding: 0;
+  border: none;
+  background: rgba(4, 7, 11, 0.62);
+  backdrop-filter: blur(2px);
+  cursor: pointer;
+  animation: fade-in 0.16s ease;
+}
+
+/* 整条把手是一个按钮，所以它自己不能有默认按钮样式 */
+.terminal-sheet-handle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  width: 100%;
+  height: var(--dock-handle);
+  padding: 0 14px;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  background: var(--ink-1);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.terminal-sheet-handle:hover {
+  background: var(--ink-3);
+}
+
+/* 把手上的小横条，提示这块是可以拉上来的 */
+.terminal-sheet-grip {
+  width: 26px;
+  height: 3px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--line-strong);
+}
+
+/* 展开提示：不是按钮，只是告诉人这块能点。点击目标是整条把手 */
+.terminal-sheet-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--fg-3);
+}
+
+.terminal-sheet-hint > svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.terminal-sheet-handle:hover .terminal-sheet-hint {
+  color: var(--fg-2);
+}
+
+.terminal-pane {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  /* 终端是全局最深的一层，让外壳退到后面去 */
+  background: var(--ink-0);
+}
+
+/* 直接作为 .xterm 的父元素，FitAddon 会按这里的计算尺寸算行列数 */
+.terminal-host {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: 10px 12px;
+}
+
+/* 隐藏而不是移除：FitAddon 要能量到尺寸，display:none 会量到 0。
+   容器一直在，重启任务时不用重建终端。 */
+.terminal-host.is-hidden {
+  visibility: hidden;
+}
+
+.terminal-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 24px;
+  text-align: center;
+}
+
+.terminal-empty .empty-hint {
+  max-width: 34em;
+}
+
+/* --------------------------------- 概览 --------------------------------- */
+
 .overview {
   display: flex;
   flex-direction: column;
@@ -825,132 +751,119 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  padding: 11px 18px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-elev);
+  gap: 12px;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--line);
 }
 
 .overview-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 15px;
-}
-
-.overview-title > svg {
-  width: 17px;
-  height: 17px;
-  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .overview-body {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 24px;
   min-height: 0;
   overflow-y: auto;
-  padding: 20px;
 }
 
-/* 统计卡片 */
-
+/* 统计条：一条发丝线分隔的记录带，不是一排卡片 */
 .stat-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  border-bottom: 1px solid var(--line);
 }
 
 .stat-card {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-rows: auto auto;
-  align-items: center;
-  gap: 1px 11px;
-  padding: 13px 15px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: var(--bg-elev);
-}
-
-.stat-icon {
-  grid-row: 1 / 3;
   display: flex;
-  color: var(--text-faint);
+  flex-direction: column;
+  gap: 3px;
+  padding: 14px 16px;
+  border-right: 1px solid var(--line);
 }
 
-.stat-icon > svg {
-  width: 19px;
-  height: 19px;
+.stat-card:last-child {
+  border-right: none;
 }
 
 .stat-value {
-  font-size: 20px;
-  font-weight: 650;
-  line-height: 1.2;
+  font-family: var(--mono);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }
 
 .stat-label {
   font-size: 12px;
-  color: var(--text-faint);
+  color: var(--fg-3);
 }
 
-.stat-card.is-running .stat-icon,
 .stat-card.is-running .stat-value {
-  color: var(--success);
+  color: var(--live);
 }
 
-.stat-card.is-stopped .stat-icon {
-  color: var(--warn);
+.stat-card.is-stopped .stat-value {
+  color: var(--hold);
 }
-
-/* 小节 */
 
 .overview-section {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.overview-section:last-child {
+  border-bottom: none;
 }
 
 .overview-section-title {
   display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 13px;
+  align-items: baseline;
+  gap: 8px;
+  padding: 14px 16px 10px;
+  font-size: 12px;
   font-weight: 600;
-  color: var(--text-dim);
+  letter-spacing: 0.04em;
+  color: var(--fg-2);
 }
 
-.overview-section-title > svg {
-  width: 15px;
-  height: 15px;
-  flex-shrink: 0;
+.overview-section-note {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--fg-3);
 }
 
 .overview-badge {
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
+  font-family: var(--mono);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 400;
+  color: var(--live);
   font-variant-numeric: tabular-nums;
 }
 
-.overview-hint {
-  font-size: 13px;
-  line-height: 1.7;
-  color: var(--text-faint);
+.overview-badge::before {
+  content: '· ';
+  color: var(--fg-3);
 }
 
-/* 正在下载 */
+.overview-hint {
+  padding: 0 16px 16px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--fg-3);
+}
 
+/* 正在下载：发丝线分行，不做卡片 */
 .overview-running {
   display: flex;
   flex-direction: column;
-  gap: 10px;
 }
 
 .overview-running-row {
@@ -958,20 +871,18 @@
   flex-direction: column;
   gap: 7px;
   width: 100%;
-  padding: 12px 14px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg-elev);
-  color: var(--text);
+  padding: 12px 16px;
+  border: none;
+  border-top: 1px solid var(--line);
+  background: transparent;
+  color: var(--fg);
   text-align: left;
-  transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
 }
 
 .overview-running-row:hover {
-  background: var(--bg-hover);
-  border-color: var(--border-strong);
+  background: var(--ink-2);
 }
 
 .overview-running-head {
@@ -985,7 +896,7 @@
   width: 15px;
   height: 15px;
   flex-shrink: 0;
-  color: var(--text-faint);
+  color: var(--fg-3);
 }
 
 .overview-running-name {
@@ -994,68 +905,70 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
-  font-weight: 600;
+  font-family: var(--mono);
+  font-size: 12.5px;
 }
 
 .overview-running-speed {
   flex-shrink: 0;
+  font-family: var(--mono);
   font-size: 12px;
-  color: var(--accent);
+  color: var(--live);
   font-variant-numeric: tabular-nums;
 }
 
 .overview-running-track {
-  height: 4px;
-  border-radius: 2px;
-  background: var(--bg-elev-2);
-  overflow: hidden;
+  height: 2px;
+  background: var(--ink-3);
 }
 
 .overview-running-fill {
   height: 100%;
-  border-radius: 2px;
-  background: linear-gradient(90deg, var(--accent), var(--info));
-  transition: width 0.4s ease;
+  background: var(--live);
+  transition: width 0.3s ease;
 }
 
 .overview-running-meta {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 12px;
-  color: var(--text-faint);
+  gap: 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--fg-3);
   font-variant-numeric: tabular-nums;
 }
 
 .overview-running-percent {
-  font-weight: 600;
-  color: var(--text-dim);
+  color: var(--fg-2);
 }
 
-/* 运行环境 */
-
+/* 运行环境：定义列表，不是卡片 */
 .env-list {
   display: flex;
   flex-direction: column;
-  gap: 9px;
-  margin: 0;
+  padding: 0 16px 16px;
 }
 
 .env-item {
   display: flex;
   align-items: baseline;
   gap: 12px;
-  font-size: 13px;
+  padding: 7px 0;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+}
+
+.env-item:first-child {
+  border-top: none;
 }
 
 .env-item dt {
   display: flex;
   align-items: center;
   gap: 7px;
-  min-width: 96px;
   flex-shrink: 0;
-  color: var(--text-faint);
+  min-width: 88px;
+  color: var(--fg-3);
 }
 
 .env-item dt > svg {
@@ -1065,116 +978,479 @@
 }
 
 .env-item dd {
-  margin: 0;
   min-width: 0;
 }
 
 .env-item code {
   font-family: var(--mono);
   font-size: 12px;
-  color: var(--text-dim);
+  color: var(--fg-2);
   word-break: break-all;
 }
 
+/* -------------------------------- 网盘浏览 -------------------------------- */
 
-/* ---------------------------- 侧栏的概览入口 ---------------------------- */
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  margin-bottom: 6px;
-  padding: 9px 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--text-dim);
-  font-size: 13px;
-  font-weight: 600;
-  text-align: left;
-  transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease,
-    color 0.15s ease;
-}
-
-.nav-item:hover {
-  background: var(--bg-hover);
-}
-
-.nav-item.is-active {
-  background: var(--accent-soft);
-  border-color: rgba(77, 141, 255, 0.4);
-  color: var(--text);
-}
-
-.nav-item > svg {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-  color: var(--accent);
-}
-
-/* ------------------------------ 速度曲线图 ------------------------------ */
-
-.speed-chart {
-  padding: 0 14px 4px;
-  /* uPlot 会自己往 canvas 上画，这里只管给个容器尺寸 */
-}
-
-.speed-chart-empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 14px 4px;
-  border-radius: var(--radius-sm);
-  border: 1px dashed var(--border);
-  color: var(--text-faint);
-  font-size: 12px;
-}
-
-/* uPlot 自带的图例/提示都关掉了，只需要压掉它的默认边框色 */
-.speed-chart .u-over {
-  background: transparent;
-}
-
-/* ------------------------- 没有输出时的终端占位 ------------------------- */
-
-.terminal-pane {
-  /* 空状态要盖在隐藏的终端之上 */
-  position: relative;
-}
-
-/* 隐藏而不是移除：FitAddon 要能量到尺寸，display:none 会让它量到 0。
-   容器一直在，切回来时不用重建终端。 */
-.terminal-host.is-hidden {
-  visibility: hidden;
-}
-
-.terminal-empty {
-  position: absolute;
-  inset: 12px;
+.browser {
   display: flex;
   flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+}
+
+.browser-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+  background: var(--ink-2);
+}
+
+.crumb-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.crumb {
+  padding: 2px 5px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--fg-2);
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.crumb:hover:not(:disabled) {
+  background: var(--ink-3);
+  color: var(--fg);
+}
+
+.crumb:disabled {
+  color: var(--fg);
+  cursor: default;
+}
+
+.crumb-sep {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  color: var(--fg-3);
+}
+
+.browser-list {
+  min-height: 240px;
+  max-height: 340px;
+  overflow-y: auto;
+  background: var(--ink-0);
+}
+
+.browser-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.browser-row:last-child {
+  border-bottom: none;
+}
+
+.browser-row:hover {
+  background: var(--ink-2);
+}
+
+.browser-row.is-selected {
+  background: rgba(53, 184, 224, 0.1);
+}
+
+.browser-row.parent-row {
+  background: var(--ink-2);
+}
+
+.entry-name {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1;
+  min-width: 0;
+  padding: 4px 5px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--fg);
+  text-align: left;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.entry-name:hover {
+  color: var(--live);
+}
+
+.entry-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: var(--fg-3);
+}
+
+.is-dir .entry-icon {
+  color: var(--hold);
+}
+
+.entry-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+
+/* 大小与修改日期直接用 CLI 的原样文本，固定宽度 + 等宽数字排成表格 */
+.entry-size {
+  flex-shrink: 0;
+  min-width: 78px;
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--fg-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.entry-mtime {
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--fg-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.browser-status {
+  padding: 28px 16px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--fg-3);
+}
+
+.browser-error {
+  color: var(--bad);
+}
+
+/* --------------------------------- 模态 --------------------------------- */
+
+/* 唯一会浮起来的一层 */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
   padding: 20px;
-  border-radius: var(--radius);
-  border: 1px dashed var(--border);
-  background: var(--bg-elev);
-  text-align: center;
+  background: rgba(4, 7, 11, 0.72);
+  backdrop-filter: blur(2px);
+  animation: fade-in 0.14s ease;
 }
 
-.terminal-empty .empty-hint {
-  max-width: 42em;
+.modal {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 460px;
+  max-height: 100%;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  background: var(--ink-2);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
 }
 
-/* 小节标题右边的补充说明 */
-.overview-section-note {
-  margin-left: 4px;
+.modal-wide {
+  max-width: 720px;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.modal-header h2 {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.modal-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--line);
+}
+
+.footer-path {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.footer-path-label {
+  flex-shrink: 0;
   font-size: 11px;
-  font-weight: 400;
-  color: var(--text-faint);
+  color: var(--fg-3);
+}
+
+.footer-path-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--fg-2);
+}
+
+.footer-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.form-error {
+  padding: 9px 11px;
+  border-left: 2px solid var(--bad);
+  background: rgba(232, 97, 94, 0.1);
+  color: var(--bad);
+  font-size: 12.5px;
+}
+
+/* --------------------------------- 轻提示 --------------------------------- */
+
+.toast {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 380px;
+  padding: 11px 13px;
+  border: 1px solid var(--line-strong);
+  border-left-width: 3px;
+  border-radius: var(--r-sm);
+  background: var(--ink-2);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+  font-size: 13px;
+  animation: fade-in 0.14s ease;
+}
+
+.toast-info {
+  border-left-color: var(--live);
+}
+
+.toast-error {
+  border-left-color: var(--bad);
+}
+
+.toast-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-close {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--fg-3);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.toast-close:hover {
+  color: var(--fg);
+}
+
+/* -------------------------------- 空状态 --------------------------------- */
+
+.empty-icon {
+  width: 30px;
+  height: 30px;
+  margin-bottom: 10px;
+  color: var(--fg-3);
+  opacity: 0.6;
+}
+
+.empty-title {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--fg-2);
+}
+
+.empty-hint {
+  margin-top: 5px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--fg-3);
+}
+
+/* ================================= 移动端 ================================= */
+
+/*
+ * 窄屏下侧栏和工作区变成两个互斥的全屏视图，靠 .app 上的 data-pane 切换：
+ *   data-pane="list"   → 显示侧栏（概览入口 + 任务列表）
+ *   data-pane="detail" → 工作区从右侧滑入，盖住侧栏
+ * 桌面端这个属性不起作用。
+ */
+@media (max-width: 860px) {
+  .app {
+    display: block;
+  }
+
+  .sidebar {
+    width: 100%;
+    border-right: none;
+  }
+
+  .workspace {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    transform: translateX(100%);
+    transition: transform 0.2s ease;
+  }
+
+  .app[data-pane='detail'] .workspace {
+    transform: none;
+  }
+
+  /* 返回按钮只在窄屏出现 */
+  .back-btn {
+    display: inline-flex;
+  }
+
+  /* 触摸目标不小于 44px */
+  .nav-item,
+  .task-row,
+  .overview-running-row,
+  .entry-name {
+    min-height: 44px;
+  }
+
+  .btn {
+    min-height: 40px;
+  }
+
+  .btn-sm {
+    min-height: 34px;
+  }
+
+  /* 读数在窄屏上收一档，但仍然要一眼可读 */
+  .progress {
+    padding: 12px 14px 11px;
+  }
+
+  .progress-percent {
+    font-size: 26px;
+  }
+
+  .stat-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stat-card:nth-child(2n) {
+    border-right: none;
+  }
+
+  .stat-value {
+    font-size: 20px;
+  }
+
+  /* 模态变成贴底的抽屉，拇指够得着 */
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modal {
+    max-width: none;
+    max-height: 88dvh;
+    border-bottom: none;
+    border-radius: var(--r) var(--r) 0 0;
+  }
+
+  .modal-footer {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+
+  /* 窄屏上浮层占屏幕的比例更大，拉上来才有足够行数；边距也收一点 */
+  .workspace {
+    --dock-height: min(80dvh, 760px);
+    --dock-gap: 10px;
+  }
+
+  /* 触摸设备没有悬停，复制按钮得一直看得见 */
+  .task-info-copy {
+    opacity: 1;
+  }
+
+  .task-info-row {
+    grid-template-columns: 80px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  /* 窄屏放不下修改日期，优先保证文件名和大小 */
+  .entry-mtime {
+    display: none;
+  }
+
+  .entry-size {
+    min-width: 64px;
+  }
+
+  .toast {
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    left: 12px;
+    max-width: none;
+  }
+}
+
+/* 刘海屏：别让内容钻进状态栏 */
+@supports (padding: env(safe-area-inset-top)) {
+  @media (max-width: 860px) {
+    .sidebar-header,
+    .overview-header,
+    .toolbar {
+      padding-top: calc(11px + env(safe-area-inset-top));
+    }
+
+    .sidebar-body {
+      padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    }
+  }
 }

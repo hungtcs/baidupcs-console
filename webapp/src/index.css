@@ -1,46 +1,67 @@
+/*
+ * 设计令牌与基础层。
+ *
+ * 这是一台「传输仪表台」：内容全是终端输出和传输数字，用它的人是隔一会儿瞥一眼。
+ * 所以整套视觉围绕一个判断来做——数据要一眼可读，装饰要退到几乎没有。
+ *
+ * 三条规则，全站遵守：
+ *   1. 只有一层表面，靠发丝线分区，不堆卡片、不用阴影、不用渐变。
+ *   2. 颜色只在有含义的地方出现：正在传 / 已停止 / 已完成 / 出错。其余都是灰阶。
+ *   3. 数字和文件名单一色等宽 + 等宽数字，说明文字才用无衬线。
+ *
+ * 不引外部字体：这是个内嵌进单个二进制的局域网工具，不该为了字体多一次网络请求。
+ */
+
 :root {
-  /* 深色主题变量 */
-  --bg: #0e1116;
-  --bg-elev: #151a21;
-  --bg-elev-2: #1b222c;
-  --bg-hover: #1f2733;
-  --border: #232b36;
-  --border-strong: #313c4a;
+  /* 表面。ink-0 只留给终端——全局最深，让终端成为重心，外壳退后。 */
+  --ink-0: #0a0d12;
+  --ink-1: #0e1218;
+  --ink-2: #141922;
+  --ink-3: #1b212b;
 
-  --text: #e7ecf3;
-  --text-dim: #9aa6b6;
-  --text-faint: #6b7788;
+  /* 发丝线。分区靠它，不靠卡片。 */
+  --line: #212936;
+  --line-strong: #303b4b;
 
-  --accent: #4d8dff;
-  --accent-hover: #6ba0ff;
-  --accent-soft: rgba(77, 141, 255, 0.14);
+  --fg: #e8edf5;
+  --fg-2: #97a3b4;
+  --fg-3: #5f6b7c;
 
-  --success: #34d399;
-  --warn: #fbbf24;
-  --danger: #f87171;
-  --purple: #a78bfa;
-  --info: #38bdf8;
+  /* 有含义的颜色。只用在有含义的元素上，不做装饰。 */
+  --live: #35b8e0;
+  --hold: #d9a13a;
+  --done: #3fbf8f;
+  --bad: #e8615e;
 
-  --radius: 10px;
-  --radius-sm: 7px;
-  --shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  /* 只有两个圆角：内联小件用 r-sm，唯一会浮起来的层（模态/提示/终端抽屉）用 r。 */
+  --r-sm: 4px;
+  --r: 8px;
 
-  --sans: system-ui, -apple-system, 'Segoe UI', 'Noto Sans SC', 'PingFang SC',
+  /* 终端浮层：收起时只露出把手这么高，展开时占 dock-height，四周留 dock-gap 的边 */
+  --dock-handle: 42px;
+  --dock-height: min(70dvh, 680px);
+  --dock-gap: 16px;
+
+  --sans:
+    system-ui, -apple-system, 'Segoe UI', 'Noto Sans SC', 'PingFang SC',
     'Microsoft YaHei', Roboto, sans-serif;
-  --mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --mono:
+    ui-monospace, SFMono-Regular, 'SF Mono', 'JetBrains Mono', Menlo, Consolas,
+    'Liberation Mono', monospace;
 
   color-scheme: dark;
   font-family: var(--sans);
   font-size: 14px;
   line-height: 1.5;
-  color: var(--text);
-  background-color: var(--bg);
+  color: var(--fg);
+  background-color: var(--ink-1);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
 }
 
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
@@ -52,35 +73,54 @@ body,
 
 body {
   margin: 0;
-  background:
-    radial-gradient(1200px 600px at 50% -20%, rgba(77, 141, 255, 0.08), transparent 70%),
-    var(--bg);
+  /* 移动端浏览器地址栏会伸缩，100dvh 比 100vh 靠谱 */
+  min-height: 100dvh;
+  overscroll-behavior: none;
 }
 
 h1,
-h2 {
+h2,
+h3,
+p,
+dl,
+dd,
+figure {
   margin: 0;
-  font-weight: 600;
 }
 
 button {
-  font-family: inherit;
-  font-size: inherit;
-  cursor: pointer;
+  font: inherit;
+  color: inherit;
 }
 
-button:disabled {
-  cursor: not-allowed;
-}
-
-input,
-select {
-  font-family: inherit;
-  font-size: inherit;
-}
-
-code {
+code,
+kbd,
+samp {
   font-family: var(--mono);
+}
+
+/* 键盘焦点必须看得见 */
+:focus-visible {
+  outline: 2px solid var(--live);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+/* 尊重系统的减弱动效设置 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* 细滚动条，配色跟表面走，不打断视觉 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
 }
 
 ::-webkit-scrollbar {
@@ -88,122 +128,181 @@ code {
   height: 10px;
 }
 
-::-webkit-scrollbar-thumb {
-  background: var(--border-strong);
-  border-radius: 999px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #3d4b5c;
-  background-clip: padding-box;
-}
-
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 
-/* 通用按钮 */
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3d4959;
+  background-clip: content-box;
+}
+
+/* --------------------------------- 按钮 --------------------------------- */
+
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 7px 14px;
-  border-radius: var(--radius-sm);
-  border: 1px solid transparent;
-  background: var(--bg-elev-2);
-  color: var(--text);
+  padding: 7px 13px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--fg);
   font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
+  cursor: pointer;
   transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease,
-    color 0.15s ease;
+    background-color 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.btn > svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
 }
 
 .btn:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
+.btn:not(:disabled):hover {
+  background: var(--ink-3);
+}
+
+/* 主操作：唯一用填充色的按钮，一屏里只应该出现一个 */
 .btn-primary {
-  background: var(--accent);
-  color: #08111f;
+  border-color: transparent;
+  background: var(--live);
+  color: #04141b;
   font-weight: 600;
 }
 
 .btn-primary:not(:disabled):hover {
-  background: var(--accent-hover);
+  background: #4fc6ea;
 }
 
+/* 次级操作：默认就是安静的，悬停才浮出来 */
 .btn-ghost {
-  background: transparent;
-  border-color: var(--border-strong);
-  color: var(--text-dim);
+  border-color: transparent;
+  color: var(--fg-2);
 }
 
 .btn-ghost:not(:disabled):hover {
-  background: var(--bg-hover);
-  color: var(--text);
-  border-color: #3d4b5c;
+  background: var(--ink-3);
+  color: var(--fg);
+}
+
+.btn-danger.btn-ghost {
+  color: var(--bad);
 }
 
 .btn-danger.btn-ghost:not(:disabled):hover {
-  color: var(--danger);
-  border-color: rgba(248, 113, 113, 0.5);
-  background: rgba(248, 113, 113, 0.1);
+  background: rgba(232, 97, 94, 0.12);
+  color: var(--bad);
 }
 
 .btn-sm {
-  padding: 4px 10px;
+  padding: 5px 10px;
   font-size: 12px;
-  border-radius: 6px;
 }
 
+.btn-sm > svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* 纯图标按钮（模态关闭等） */
 .icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 30px;
   height: 30px;
-  border-radius: 8px;
+  padding: 0;
   border: none;
+  border-radius: var(--r-sm);
   background: transparent;
-  color: var(--text-dim);
-  font-size: 20px;
-  line-height: 1;
+  color: var(--fg-3);
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.icon-btn > svg {
+  width: 17px;
+  height: 17px;
 }
 
 .icon-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text);
+  background: var(--ink-3);
+  color: var(--fg);
 }
 
-/* 表单 */
+/* --------------------------------- 表单 --------------------------------- */
+
 .input {
   width: 100%;
   padding: 8px 11px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-strong);
-  background: var(--bg);
-  color: var(--text);
-  outline: none;
-  transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
-}
-
-.input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-strong);
+  background: var(--ink-0);
+  color: var(--fg);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  transition: border-color 0.12s ease;
 }
 
 .input::placeholder {
-  color: var(--text-faint);
+  color: var(--fg-3);
 }
 
-select.input {
-  cursor: pointer;
+.input:focus {
+  border-color: var(--live);
+  outline: none;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.field-label {
+  font-size: 12px;
+  color: var(--fg-2);
+}
+
+/* --------------------------------- 动画 --------------------------------- */
+
+/* 只有这一个动效：运行中的图标转起来。其余一切静止。 */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.is-spin {
+  animation: spin 1.1s linear infinite;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
