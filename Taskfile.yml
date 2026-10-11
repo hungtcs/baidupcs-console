@@ -1,0 +1,57 @@
+# 任务入口。具体逻辑都在 scripts/ 下的脚本里。
+version: '3'
+
+vars:
+  BINARY: build/bpcs-console
+
+tasks:
+  default:
+    desc: 列出所有可用任务
+    silent: true
+    cmds:
+      - task --list
+
+  build:
+    desc: 构建前端 + 后端，产出 build/bpcs-console
+    cmds:
+      # 必须串行：后端要 embed 前端刚产出的 webapp/dist。
+      - task: web
+      - task: backend
+
+  backend:
+    desc: 只构建后端（复用 webapp/dist 里已有的前端产物）
+    cmds:
+      - ./scripts/build-backend.sh
+
+  web:
+    desc: 只构建前端
+    cmds:
+      - ./scripts/build-web.sh
+
+  run:
+    desc: 构建并运行
+    cmds:
+      - task: build
+      - cmd: ./build/bpcs-console
+        ignore_error: false
+
+  dev:
+    desc: 开发模式：后端 :8080 + 前端 dev server :5173（/api 已代理）
+    interactive: true
+    cmds:
+      - ./scripts/dev.sh
+
+  check:
+    desc: 静态检查（go vet + go test + tsc + oxlint）
+    cmds:
+      - ./scripts/check.sh
+
+  test:
+    desc: 只跑后端单元测试
+    cmds:
+      - go test ./...
+
+  clean:
+    desc: 清理构建产物
+    cmds:
+      - ./scripts/clean.sh
