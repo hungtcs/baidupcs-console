@@ -1,83 +1,75 @@
 # BaiduPCS-Console
 
-给 [BaiduPCS-Go](https://github.com/qjfoidnh/BaiduPCS-Go) 套一个网页控制台，用来在局域网里远程浏览网盘、发起下载、看实时进度。
+给 [BaiduPCS-Go](https://github.com/qjfoidnh/BaiduPCS-Go) 套一个网页界面：在局域网里用浏览器（包括手机）浏览网盘、发起下载、看实时进度。
 
-BaiduPCS-Go 本身不提供网页接口，所以这里用一个独立的 Go 后端去 exec 这个 CLI。
+下载和浏览都由本机已登录的 BaiduPCS-Go 完成，这个程序只是把它跑起来并把结果呈现出来。
 
-## 设计取舍
+## 界面
 
-终端输出是权威的：后端把 `BaiduPCS-Go` 当后台进程跑起来，把它的 stdout/stderr **原始字节**
-通过 WebSocket 透传给前端的 [xterm.js](https://xtermjs.org/)。CLI 的进度条是用 `\r` 覆盖刷新的，
-xterm 天然就能正确渲染，ANSI 颜色也一样。
+左边是任务列表，右边是概览页或任务详情页，终端浮在底部。
 
-在此之上做了两处**额外**解析，只为了让界面更好用，不取代终端：
-
-- **`ls`** → 可点击的网盘目录浏览；
-- **`download` 的进度行** → 终端上方的进度条（百分比、速度、剩余时间）。
-
-两处解析都保留 CLI 的**原样文本**（如 `465.96MB`、`100.99KB/s`），前端直接显示，避免从字节数
-反推格式带来的偏差。解析是旁路：正则匹配不上就什么都不做，绝不因为解析不出进度而丢掉终端字节。
+- **概览**：任务统计、正在下载的进度、合计速度曲线、运行环境。
+- **任务详情**：以任务信息为主体（网盘路径、保存位置、耗时、能否续传、完整命令），
+  上面是进度读数和速度曲线，底部是可上滑展开的终端——CLI 的原始输出，一字节不改。
+- **终端**：进度条、`\r` 刷新、ANSI 颜色全部原样呈现。后端不解析它、也不改写它。
 
 ## 依赖
 
-- Go 1.25+
-- Node 20+ / pnpm（只在构建前端时需要）
-- 本机已安装并登录 `BaiduPCS-Go`（`BaiduPCS-Go login`）
+- Linux（x86_64 或 arm64）
+- **BaiduPCS-Go 已安装并登录**（`BaiduPCS-Go login`）——它不随本程序分发，需要你自己装
+- systemd（用于后台常驻）
 
-## 构建与运行
+## 安装
 
-用 [Task](https://taskfile.dev/) 作任务入口，具体逻辑在 `scripts/` 下。
+### 从 deb / rpm
 
-```bash
-task build     # 构建前端 + 后端 → build/bpcs-console
-./build/bpcs-console
-```
-
-默认监听 `0.0.0.0:8080`，浏览器打开 `http://<本机IP>:8080`。
-
-| 命令 | 说明 |
-| --- | --- |
-| `task build` | 构建前端 + 后端 |
-| `task backend` | 只构建后端（复用 `webapp/dist` 里已有的前端产物） |
-| `task web` | 只构建前端 |
-| `task run` | 构建并运行 |
-| `task dev` | 开发模式：后端 `:8080` + 前端 dev server `:5173`（`/api` 已代理，带热更新） |
-| `task check` | 静态检查：`go vet` + `go test` + `tsc` + `oxlint` |
-| `task test` | 只跑后端单元测试 |
-| `task clean` | 清理构建产物 |
-
-## 打包与发版
-
-打一个 tag 就会自动构建、打包、发 Release：
+到 [Releases](https://github.com/hungtcs/baidupcs-console/releases) 下载对应架构的包：
 
 ```bash
-git tag v0.1.0 && git push origin v0.1.0
+# Debian / Ubuntu
+sudo dpkg -i baidupcs-console_<版本>_amd64.deb
+
+# Fedora / RHEL
+sudo rpm -i baidupcs-console-<版本>-1.x86_64.rpm
 ```
 
-GitHub Actions（`.github/workflows/release.yml`）会：构建前端 → 跑测试 → 交叉编译
-amd64/arm64 → 用 [nfpm](https://nfpm.goreleaser.com/) 打出 deb 和 rpm → 创建 Release 并把包挂上去。
-
-也可以在 Actions 页面手动触发一次（`workflow_dispatch`）验证流程，手动跑**不会**创建 Release，
-产物只留在该次运行的 artifacts 里。
-
-### 包里装了什么
-
-| 路径 | 说明 |
-| --- | --- |
-| `/usr/bin/baidupcs-console` | 二进制，前端已经 `go:embed` 进去，就这一个文件 |
-| `/usr/lib/systemd/user/baidupcs-console.service` | systemd **用户** unit |
-| `/usr/share/doc/baidupcs-console/` | README 与接口文档 |
-
-包**不会**自动启用服务——用户 unit 没法由安装脚本替某个用户开启，而且这个程序要读那个用户的
-`~/.config/BaiduPCS-Go/` 登录态、写他的 `~/Downloads`，默认跑成谁都不对。装完的提示会告诉你敲什么：
+装完**不会自动启用服务**——这是个 systemd **用户**服务，因为它要读你自己的
+`~/.config/BaiduPCS-Go/` 登录态、写你自己的 `~/Downloads`，跑成别的身份都不对。
+所以由使用它的那个人自己启用：
 
 ```bash
 systemctl --user daemon-reload
 systemctl --user enable --now baidupcs-console
-loginctl enable-linger "$USER"
+loginctl enable-linger "$USER"      # 不登录也开机自启
 ```
 
-`BaiduPCS-Go` 不属于这个包，所以 unit 里没写死它的路径、走 PATH 查找。找不到就加个 override：
+然后浏览器打开 `http://<本机IP>:8080`。
+
+### 从源码
+
+需要 Go 1.25+、Node 20+、pnpm、[Task](https://taskfile.dev/)：
+
+```bash
+task build      # 构建前端 + 后端 → build/bpcs-console
+./build/bpcs-console
+```
+
+想把源码装成服务：`task deploy`。详见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)。
+
+## 装完之后
+
+**局域网里其他设备连不上** —— Fedora/RHEL 默认开着 firewalld，放行一下：
+
+```bash
+sudo firewall-cmd --add-port=8080/tcp --permanent && sudo firewall-cmd --reload
+```
+
+**服务起不来** —— 先看日志：`journalctl --user -u baidupcs-console -n 50`。
+撞端口之类的问题会被 `StartLimitBurst` 拦下，处理完之后要
+`systemctl --user reset-failed baidupcs-console` 才能再启动。
+
+**提示找不到 BaiduPCS-Go** —— unit 里没写死它的路径（它不属于这个包，装在哪由你决定）。
+如果 systemd 的 PATH 找不到它，给服务加个 override：
 
 ```bash
 systemctl --user edit baidupcs-console
@@ -85,132 +77,50 @@ systemctl --user edit baidupcs-console
 # Environment=BPCS_CLI_PATH=/usr/local/bin/BaiduPCS-Go
 ```
 
-### 本地打包
-
-```bash
-VERSION=0.1.0 task package                 # amd64 + arm64
-VERSION=0.1.0 ARCHES=amd64 task package    # 只出 amd64
-```
-
-需要 nfpm：`go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.47.0`。
-产物在 `dist/`。
-
-### 版本号
-
-构建时通过 `-ldflags -X main.version=...` 注入（见 `scripts/package.sh`）。直接 `go build` 则是 `dev`。
-
-```bash
-baidupcs-console --version     # 打印版本后退出
-```
-
-运行中的实例会把版本显示在概览页的「运行环境」里，也写进 `GET /api/health` 的 `version`。
-
-## 部署（systemd 用户服务）
-
-```bash
-task deploy      # 构建 → 装到 ~/.local/bin → 生成 unit → 开机自启 → 启动
-```
-
-**为什么是用户服务而不是系统服务**：这个程序 exec 的 `BaiduPCS-Go` 从
-`~/.config/BaiduPCS-Go/` 读登录态，下载落在 `~/Downloads`。跑成系统服务就是 root 身份、
-`HOME=/root`，这两处都找不到，得额外配 `User=` 和 `Environment=HOME=` 才能绕回来。
-用户服务天然就是当前用户，再配合 `loginctl enable-linger` 就能不登录也开机自启。
-
-`task deploy` 做了这些：
-
-1. 把二进制装到 `~/.local/bin/baidupcs-console`；
-2. 探测 `BaiduPCS-Go` 的实际路径（写死进 unit，不依赖 systemd 的 PATH）；
-3. 由 `deploy/baidupcs-console.service.in` 生成 unit 到 `~/.config/systemd/user/`；
-4. `loginctl enable-linger $USER` —— 不登录也随开机启动；
-5. `daemon-reload` + `enable` + `restart`。
-
-任务记录放在 `~/.local/share/baidupcs-console`（XDG 数据目录，不在仓库里）。
-
-### 日常操作
-
-```bash
-systemctl --user status  baidupcs-console       # 状态
-systemctl --user restart baidupcs-console       # 重启（等于重新 task deploy 的第二步）
-systemctl --user stop    baidupcs-console       # 停止
-journalctl --user -u baidupcs-console -f        # 跟日志
-loginctl show-user "$USER" --property=Linger    # 确认 linger 开着
-```
-
-改端口：`BPCS_LISTEN=0.0.0.0:8081 task deploy`。
-
-更新版本：`task deploy` 再来一次即可（会重新装二进制并重启服务）。
-
-### ⚠️ 重启会打断正在跑的下载
-
-`systemctl --user restart`（以及 `task deploy`）会先杀掉所有还在跑的 `BaiduPCS-Go`，
-再关服务。已下载的分片和断点续传元数据都会保留，重启后任务显示为「已停止」，
-点「继续」就从断点接着下——但**下载确实会中断一下**，别在下大文件时随手重启。
-
-服务起不来时先在 journal 里看原因。撞端口之类的会被 `StartLimitBurst=5` 拦下，
-处理完之后要 `systemctl --user reset-failed baidupcs-console` 才能再启动。
-
-### 局域网访问放行端口
-
-Fedora 默认开着 firewalld，不放行的话手机连不上：
-
-```bash
-sudo firewall-cmd --add-port=8080/tcp --permanent && sudo firewall-cmd --reload
-```
-
-### 卸载
-
-```bash
-systemctl --user disable --now baidupcs-console
-rm -f ~/.config/systemd/user/baidupcs-console.service ~/.local/bin/baidupcs-console
-systemctl --user daemon-reload
-# 任务记录和已下载的文件都在，要清就自己删：
-#   ~/.local/share/baidupcs-console/
-```
-
 ## 配置
 
-全部走环境变量，可选地写进 `.env`（参考 `.env.example`）。优先级：进程环境变量 > `.env` > 内置默认值。
+全部走环境变量，可选地写进 `.env`（参考 [.env.example](.env.example)）。
+优先级：进程环境变量 > `.env` > 内置默认值。
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `BPCS_LISTEN` | `0.0.0.0:8080` | HTTP 监听地址 |
-| `BPCS_CLI_PATH` | `BaiduPCS-Go` | CLI 可执行文件路径 |
+| `BPCS_CLI_PATH` | `BaiduPCS-Go` | BaiduPCS-Go 可执行文件路径 |
 | `BPCS_SAVE_ROOT` | `~/Downloads` | 下载落盘根目录 |
 | `BPCS_DATA_DIR` | `data` | 任务记录目录，一个任务一个 JSON |
 | `BPCS_MODE` | `locate` | 下载模式：`locate` / `pcs` / `stream` |
 | `BPCS_MAX_THREADS` | `0` | CLI 的 `-p` 参数，0 用 CLI 默认 |
 | `BPCS_OUTPUT_BUFFER_BYTES` | `4194304` | 每个任务在内存里保留的输出上限 |
 
+改配置后重启服务生效：
+
+```bash
+systemctl --user restart baidupcs-console
+```
+
 ## ⚠️ 安全
 
-**这个服务不鉴权，并且默认监听 `0.0.0.0`。** 它按局域网自用设计，任何能访问到这个端口的人
-都可以浏览你的网盘内容并发起下载。**不要暴露到公网。** 需要收紧的话把 `BPCS_LISTEN` 改成
-`127.0.0.1:8080`，再通过 SSH 隧道访问。
+**这个服务不鉴权，并且默认监听 `0.0.0.0`。** 任何能访问到这个端口的人都可以浏览你的网盘内容、发起下载。**不要暴露到公网。** 需要收紧的话把 `BPCS_LISTEN` 改成 `127.0.0.1:8080`，再通过 SSH 隧道访问。
 
 ## 已知行为
 
-- **CLI 出错时退出码也是 0**，所以不能靠退出码判断下载成败，要看终端输出。任务列表里的
-  「已结束」只表示进程退出了，不代表下载成功。
+- **CLI 出错时退出码也是 0**，所以不能靠退出码判断成败。任务列表里的「已结束」只表示进程退出了，不代表下载成功——成败要看终端输出。
 - 目标文件已存在时 CLI 会跳过（打印 `文件已存在: ..., 跳过...`），所以重复下载会瞬间「结束」。
-- 「重新开始」复用 CLI 的断点续传：已下载的分片会保留，从断点接着下。
-- **任务列表会持久化**：每个任务一个 JSON 文件，存在 `<BPCS_DATA_DIR>/tasks/<任务ID>.json`，重启后自动恢复。
-- 退出程序（Ctrl+C）时会先杀掉所有还在跑的下载进程，再关闭 HTTP 服务。被中断的任务重启后显示为「已停止」，点「重新开始」即可从断点续传。
-- **终端输出不持久化**：输出只放在内存里（每任务上限 4MB）。重启后任务还在，但点开终端是空的，要看到新的输出得「重新开始」。
-- 用 air 之类的热重载工具时注意：每次改 `.go` 文件都会重启服务，从而中断正在跑的下载。任务记录不会丢，但下载会停。
+- 「继续 / 重新开始」由磁盘上有没有未下完的分片决定：有分片就是「继续」（走 CLI 的断点续传），没有就是「重新开始」。
+- **终端输出不持久化**：只放在内存里（每任务上限 4MB）。重启后任务还在，但点开终端是空的，得「继续」才有新输出。
+- 任务记录持久化在 `<BPCS_DATA_DIR>/tasks/<id>.json`，重启后自动恢复。上次在跑的任务恢复成「已停止」。
+- **重启服务会打断正在跑的下载**（分片和续传信息都保留，点「继续」接着下）。
+- 所有任务平铺下载到 `BPCS_SAVE_ROOT`，不建每任务子目录；不同网盘目录下的同名文件会冲突，后者被跳过。
 
-## 接口
+## 文档
 
-见 [docs/API.md](docs/API.md)。
+| 文档 | 内容 |
+| --- | --- |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | 部署详解：两种装法、开机自启、日志、更新、卸载 |
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | 开发：设计取舍、构建、测试、目录结构 |
+| [docs/RELEASE.md](docs/RELEASE.md) | 打包与发版 |
+| [docs/API.md](docs/API.md) | HTTP 接口与 WebSocket 协议 |
 
-## 目录结构
+## 许可
 
-```
-main.go                  程序入口、优雅退出
-assets.go                go:embed 前端产物（必须在根包，embed 不能引用上级目录）
-internal/config/         dotenv + cleanenv 加载配置
-internal/pcs/            调用 BaiduPCS-Go 并解析 ls/meta 的文本输出
-internal/session/        后台进程、输出环形缓冲、订阅广播、任务持久化
-internal/httpapi/        echo v5 路由、终端 WebSocket
-webapp/                  Vite + React + TypeScript 前端
-docs/API.md              接口契约
-```
+[MIT](LICENSE)

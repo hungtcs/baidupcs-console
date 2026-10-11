@@ -1,23 +1,23 @@
 
 [0] 提示: 当前下载最大并发量为: 1, 下载缓存为: 65536
-[1] 加入下载队列: /我的资源/Document/Notes/Chrome运行Android.txt
+[1] 加入下载队列: /示例资料/asset_pa/temp_/素材测试示例报告数.txt
 
 [1] ----
   类型              文件                                            
-  文件路径          /我的资源/Document/Notes/Chrome运行Android.txt  
-  文件名称          Chrome运行Android.txt                           
+  文件路径          /示例资料/asset_pa/temp_/素材测试示例报告数.txt  
+  文件名称          素材测试示例报告数.txt                           
   文件大小          2018, 1.970703KB                                
-  md5 (截图请打码)  db009d99412a402b031561f8f153e6d7                
+  md5 (截图请打码)  00000004000000040000000400000004                
   app_id            250528                                          
-  fs_id             739793078800285                                 
+  fs_id             100000000095028                                 
   创建日期          2015-04-15 16:58:00                             
   修改日期          2015-12-12 18:46:12                             
 
-[1] 准备下载: /我的资源/Document/Notes/Chrome运行Android.txt
-[1] 将会下载到路径: /home/hungtcs/.claude/jobs/6b9c2c31/tmp/cap/small/Chrome运行Android.txt
+[1] 准备下载: /示例资料/asset_pa/temp_/素材测试示例报告数.txt
+[1] 将会下载到路径: /tmp/capture/small/素材测试示例报告数.txt
 
 
-[1] 下载完成, 保存位置: /home/hungtcs/.claude/jobs/6b9c2c31/tmp/cap/small/Chrome运行Android.txt
+[1] 下载完成, 保存位置: /tmp/capture/small/素材测试示例报告数.txt
 [1] 跳过文件有效性检验
 
 下载结束, 时间: 1.525s, 数据总量: 1.970703KB

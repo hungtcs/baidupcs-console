@@ -13,21 +13,21 @@ const realLsRoot = `
 当前目录: /
 ----
   #    文件大小         修改日期                     文件(目录)
-  0             -  2017-07-20 17:03:36  @hungtcs/
-  1             -  2014-06-10 01:20:15  apps/
-  2             -  2024-03-19 23:08:28  Games/
-  3             -  2016-01-12 22:15:04  Programmer/
-  4             -  2026-09-16 20:58:40  Temp/
-  5             -  2020-04-16 16:44:43  电子书/
-  6             -  2026-09-11 00:50:24  我的资源/
-  7      465.96MB  2026-10-11 20:09:43  YX57599-STM8S103FP6系统板-190508.zip
+  0             -  2017-07-20 17:03:36  @example/
+  1             -  2014-06-10 01:20:15  node/
+  2             -  2024-03-19 23:08:28  core_/
+  3             -  2016-01-12 22:15:04  node_base_/
+  4             -  2026-09-16 20:58:40  unit/
+  5             -  2020-04-16 16:44:43  模板项/
+  6             -  2026-09-11 00:50:24  示例资料/
+  7      465.96MB  2026-10-11 20:09:43  示例报告数据配置脚本模板项目资料.zip
      总: 465.96MB                       文件总数: 1, 目录总数: 7
 ----
 `
 
 // 名字里有空格、顿号、全角字符，且列宽被中文撑开。
 const realLsWithSpaces = `
-当前目录: /我的资源/STM32F103RCT6   RBT6开发板 开发板资料
+当前目录: /示例资料/core_main_par   RBT6开发板 开发板资料
 ----
   #   文件大小        修改日期                           文件(目录)
   0           -  2019-02-07 12:17:22  1、程序开发工具/
@@ -38,28 +38,28 @@ const realLsWithSpaces = `
 `
 
 const realMetaFile = `
-[0] - [/我的资源/Document/Notes/Chrome运行Android.txt] --------------
+[0] - [/示例资料/asset_pa/temp_/素材测试示例报告数.txt] --------------
 
   类型              文件
-  文件路径          /我的资源/Document/Notes/Chrome运行Android.txt
-  文件名称          Chrome运行Android.txt
+  文件路径          /示例资料/asset_pa/temp_/素材测试示例报告数.txt
+  文件名称          素材测试示例报告数.txt
   文件大小          2018, 1.970703KB
-  md5 (截图请打码)  db009d99412a402b031561f8f153e6d7
+  md5 (截图请打码)  00000004000000040000000400000004
   app_id            250528
-  fs_id             739793078800285
+  fs_id             100000000095028
   创建日期          2015-04-15 16:58:00
   修改日期          2015-12-12 18:46:12
 
 `
 
 const realMetaDir = `
-[0] - [/我的资源/Document] --------------
+[0] - [/示例资料/asset_pa] --------------
 
   类型            目录
-  目录路径        /我的资源/Document
-  目录名称        Document
+  目录路径        /示例资料/asset_pa
+  目录名称        asset_pa
   app_id          250528
-  fs_id           898837518163087
+  fs_id           100000000150461
   创建日期        2014-05-09 17:54:14
   修改日期        2015-12-12 18:40:20
   是否含有子目录  true
@@ -82,11 +82,11 @@ func TestParseLsRoot(t *testing.T) {
 
 	// 目录：大小列是 "-"，名字以 "/" 结尾。
 	first := entries[0]
-	if first.Name != "@hungtcs" || !first.IsDir || first.Size != 0 {
+	if first.Name != "@example" || !first.IsDir || first.Size != 0 {
 		t.Errorf("第 0 项解析错误: %+v", first)
 	}
-	if first.Path != "/@hungtcs" {
-		t.Errorf("路径应为 /@hungtcs，实际 %q", first.Path)
+	if first.Path != "/@example" {
+		t.Errorf("路径应为 /@example，实际 %q", first.Path)
 	}
 	if first.ModTime != "2017-07-20T17:03:36+08:00" && !strings.HasPrefix(first.ModTime, "2017-07-20T17:03:36") {
 		t.Errorf("修改时间解析错误: %q", first.ModTime)
@@ -101,7 +101,7 @@ func TestParseLsRoot(t *testing.T) {
 	}
 
 	// 中文目录名不能被尾随空格污染。
-	if entries[5].Name != "电子书" || !entries[5].IsDir {
+	if entries[5].Name != "模板项" || !entries[5].IsDir {
 		t.Errorf("中文目录名解析错误: %+v", entries[5])
 	}
 
@@ -114,7 +114,7 @@ func TestParseLsRoot(t *testing.T) {
 	if last.Size != want {
 		t.Errorf("大小应为 %d，实际 %d", want, last.Size)
 	}
-	if last.Name != "YX57599-STM8S103FP6系统板-190508.zip" {
+	if last.Name != "示例报告数据配置脚本模板项目资料.zip" {
 		t.Errorf("文件名解析错误: %q", last.Name)
 	}
 	// CLI 显示的是 465.96MB；从字节数反推不保证能还原，所以必须是原样文本。
@@ -134,7 +134,7 @@ func TestParseLsRoot(t *testing.T) {
 }
 
 func TestParseLsNamesWithSpaces(t *testing.T) {
-	entries := parseLs(realLsWithSpaces, "/我的资源/STM32F103RCT6   RBT6开发板 开发板资料")
+	entries := parseLs(realLsWithSpaces, "/示例资料/core_main_par   RBT6开发板 开发板资料")
 
 	if len(entries) != 4 {
 		t.Fatalf("期望 4 个条目，实际 %d 个: %+v", len(entries), entries)
@@ -169,19 +169,19 @@ func TestParseLsEmpty(t *testing.T) {
 }
 
 func TestParseMetaFile(t *testing.T) {
-	m := parseMeta(realMetaFile, "/我的资源/Document/Notes/Chrome运行Android.txt")
+	m := parseMeta(realMetaFile, "/示例资料/asset_pa/temp_/素材测试示例报告数.txt")
 
 	if m.IsDir {
 		t.Error("不该被判定为目录")
 	}
-	if m.Name != "Chrome运行Android.txt" {
+	if m.Name != "素材测试示例报告数.txt" {
 		t.Errorf("文件名错误: %q", m.Name)
 	}
 	// "文件大小 2018, 1.970703KB" 里逗号前是精确字节数。
 	if m.Size != 2018 {
 		t.Errorf("大小应为 2018，实际 %d", m.Size)
 	}
-	if m.MD5 != "db009d99412a402b031561f8f153e6d7" {
+	if m.MD5 != "00000004000000040000000400000004" {
 		t.Errorf("md5 错误: %q", m.MD5)
 	}
 	// 键 "md5 (截图请打码)" 里有一个单空格，不能把键切坏。
@@ -191,12 +191,12 @@ func TestParseMetaFile(t *testing.T) {
 }
 
 func TestParseMetaDir(t *testing.T) {
-	m := parseMeta(realMetaDir, "/我的资源/Document")
+	m := parseMeta(realMetaDir, "/示例资料/asset_pa")
 
 	if !m.IsDir {
 		t.Error("应被判定为目录")
 	}
-	if m.Name != "Document" {
+	if m.Name != "asset_pa" {
 		t.Errorf("目录名错误: %q", m.Name)
 	}
 	if m.Size != 0 {
@@ -270,9 +270,9 @@ func TestNormalizeRemote(t *testing.T) {
 	cases := []struct{ in, want string }{
 		{"", "/"},
 		{"/", "/"},
-		{"我的资源", "/我的资源"},
-		{"/我的资源/", "/我的资源"},
-		{"/我的资源//Document", "/我的资源/Document"},
+		{"示例资料", "/示例资料"},
+		{"/示例资料/", "/示例资料"},
+		{"/示例资料//asset_pa", "/示例资料/asset_pa"},
 		{"/a/./b", "/a/b"},
 	}
 	for _, c := range cases {
@@ -285,9 +285,9 @@ func TestNormalizeRemote(t *testing.T) {
 func TestParentRemote(t *testing.T) {
 	cases := []struct{ in, want string }{
 		{"/", "/"},
-		{"/我的资源", "/"},
-		{"/我的资源/Document", "/我的资源"},
-		{"/我的资源/Document/", "/我的资源"},
+		{"/示例资料", "/"},
+		{"/示例资料/asset_pa", "/示例资料"},
+		{"/示例资料/asset_pa/", "/示例资料"},
 	}
 	for _, c := range cases {
 		if got := ParentRemote(c.in); got != c.want {
@@ -297,8 +297,8 @@ func TestParentRemote(t *testing.T) {
 }
 
 func TestDownloadArgs(t *testing.T) {
-	got := DownloadArgs("/我的资源/a.pdf", "/data/dl", "locate", 0)
-	want := []string{"download", "--saveto", "/data/dl", "--mode", "locate", "/我的资源/a.pdf"}
+	got := DownloadArgs("/示例资料/a.pdf", "/unit/dl", "locate", 0)
+	want := []string{"download", "--saveto", "/unit/dl", "--mode", "locate", "/示例资料/a.pdf"}
 	if strings.Join(got, "\x00") != strings.Join(want, "\x00") {
 		t.Errorf("DownloadArgs() = %v, 期望 %v", got, want)
 	}
@@ -311,15 +311,15 @@ func TestDownloadArgs(t *testing.T) {
 	}
 
 	// 路径带空格时必须作为一个独立参数传，不能靠 shell 拼接。
-	got = DownloadArgs("/我的资源/a b.pdf", "/dl", "", 0)
-	if got[len(got)-1] != "/我的资源/a b.pdf" {
+	got = DownloadArgs("/示例资料/a b.pdf", "/dl", "", 0)
+	if got[len(got)-1] != "/示例资料/a b.pdf" {
 		t.Errorf("带空格的路径应保持为单个参数: %v", got)
 	}
 }
 
 func TestCommandLineQuotesSpaces(t *testing.T) {
-	line := CommandLine("BaiduPCS-Go", []string{"download", "/我的资源/a b.pdf"})
-	if !strings.Contains(line, `"/我的资源/a b.pdf"`) {
+	line := CommandLine("BaiduPCS-Go", []string{"download", "/示例资料/a b.pdf"})
+	if !strings.Contains(line, `"/示例资料/a b.pdf"`) {
 		t.Errorf("含空格的参数应被引号包起来，实际: %s", line)
 	}
 }

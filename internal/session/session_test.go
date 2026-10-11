@@ -196,7 +196,7 @@ func TestTaskSnapshotIsIndependent(t *testing.T) {
 // 进程输出里的进度行应当被解析进 Task.Progress。
 func TestSessionParsesProgress(t *testing.T) {
 	sess := runShell(t,
-		"printf '[1] 准备下载: /我的资源/big.bin\\n'; "+
+		"printf '[1] 准备下载: /示例资料/big.bin\\n'; "+
 			"printf '[1] ↓ 1.00MB/2.00MB 100.00KB/s in 10s, left 10s ............\\r'; "+
 			"printf '[1] 下载完成, 保存位置: /tmp/big.bin\\n'; "+
 			"printf '下载结束, 时间: 10s, 数据总量: 2.00MB\\n'",

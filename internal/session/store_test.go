@@ -23,11 +23,11 @@ func sampleTask(id string) Task {
 	finished := started.Add(90 * time.Second)
 	return Task{
 		ID:          id,
-		Name:        "595274 ARM Cortex-M3与Cortex-M4权威指南.pdf",
-		RemotePath:  "/我的资源/595274 ARM Cortex-M3与Cortex-M4权威指南.pdf",
-		SaveDir:     "/home/hungtcs/Downloads",
-		Args:        []string{"download", "--saveto", "/home/hungtcs/Downloads", "/我的资源/..."},
-		CommandLine: "BaiduPCS-Go download --saveto /home/hungtcs/Downloads /我的资源/...",
+		Name:        "备份文档图片视频音频归档素材测试示例报告.pdf",
+		RemotePath:  "/示例资料/备份文档图片视频音频归档素材测试示例报告.pdf",
+		SaveDir:     "/home/user/Downloads",
+		Args:        []string{"download", "--saveto", "/home/user/Downloads", "/示例资料/..."},
+		CommandLine: "BaiduPCS-Go download --saveto /home/user/Downloads /示例资料/...",
 		Status:      StatusExited,
 		ExitCode:    0,
 		PID:         100742,

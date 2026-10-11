@@ -78,7 +78,7 @@ export function AddTaskDialog({ onClose, onCreate, onCreated }: AddTaskDialogPro
           className="input"
           type="text"
           value={selected}
-          placeholder="例如 /我的资源/a.pdf，也可以从下方浏览选择"
+          placeholder="例如 /示例资料/a.pdf，也可以从下方浏览选择"
           onChange={(event) => setSelected(event.target.value)}
           spellCheck={false}
         />

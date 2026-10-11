@@ -43,7 +43,7 @@ type Progress struct {
 var progressLineRe = regexp.MustCompile(
 	`^\[(\d+)\]\s+[↓↑]\s+([^/\s]+)/(\S+)\s+(\S+)\s+in\s+(\S+),\s+left\s+(\S+)`)
 
-// [17] 准备下载: /我的资源/.../adx.gif
+// [17] 准备下载: /示例资料/.../ass.gif
 var prepareLineRe = regexp.MustCompile(`^\[(\d+)\]\s+准备下载:\s*(.+)$`)
 
 // [17] 下载完成, 保存位置: /home/...

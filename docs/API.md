@@ -21,13 +21,13 @@ stdout/stderr 字节透传给浏览器、提供列目录和任务增删这几个
 ```jsonc
 {
   "id": "t_e48d3982",
-  "name": "595274 ARM Cortex-M3与Cortex-M4权威指南.pdf",  // 展示名
-  "remotePath": "/我的资源/595274 ARM Cortex-M3与Cortex-M4权威指南.pdf",
-  "saveDir": "/home/hungtcs/Downloads",   // 落盘目录（即 --saveto 的值）
+  "name": "备份文档图片视频音频归档素材测试示例报告.pdf",  // 展示名
+  "remotePath": "/示例资料/备份文档图片视频音频归档素材测试示例报告.pdf",
+  "saveDir": "/home/user/Downloads",   // 落盘目录（即 --saveto 的值）
   "isDir": false,            // 下载的是整个目录（界面据此区分文件夹/文件图标）
   "resumable": true,         // 磁盘上还有未下完的分片，重跑会从断点接着下
-  "args": ["download", "--saveto", "/home/hungtcs/Downloads", "--mode", "locate", "/我的资源/..."],
-  "commandLine": "BaiduPCS-Go download --saveto /home/hungtcs/Downloads --mode locate /我的资源/...",
+  "args": ["download", "--saveto", "/home/user/Downloads", "--mode", "locate", "/示例资料/..."],
+  "commandLine": "BaiduPCS-Go download --saveto /home/user/Downloads --mode locate /示例资料/...",
   "status": "running",       // running | exited | killed
   "exitCode": 0,             // killed 时为 -1；注意 CLI 出错时退出码也是 0
   "pid": 100742,
@@ -47,7 +47,7 @@ stdout/stderr 字节透传给浏览器、提供列目录和任务增删这几个
 
 ```jsonc
 {
-  "currentName": "adx.gif",   // 当前文件名，来自「准备下载: <路径>」
+  "currentName": "ass.gif",   // 当前文件名，来自「准备下载: <路径>」
   "doneText": "1.88MB",       // 原样文本，直接显示才能与终端一致
   "totalText": "139.20MB",
   "doneBytes": 1971322,
@@ -98,12 +98,12 @@ stdout/stderr 字节透传给浏览器、提供列目录和任务增删这几个
 
 ```jsonc
 {
-  "path": "/我的资源",
+  "path": "/示例资料",
   "parent": "/",
   "entries": [
     {
-      "name": "Document",
-      "path": "/我的资源/Document",   // 完整路径，可直接用于创建任务
+      "name": "asset_pa",
+      "path": "/示例资料/asset_pa",   // 完整路径，可直接用于创建任务
       "isDir": true,
 
       "size": 0,                      // 解析出的字节数，目录为 0
@@ -128,7 +128,7 @@ stdout/stderr 字节透传给浏览器、提供列目录和任务增删这几个
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | `GET` | `/api/tasks` | `{"tasks":[Task]}`，最新的在前。 |
-| `POST` | `/api/tasks` | body `{"remotePath":"/我的资源/a.pdf"}` → `201 Task`。会先校验路径存在，再启动后台进程。 |
+| `POST` | `/api/tasks` | body `{"remotePath":"/示例资料/a.pdf"}` → `201 Task`。会先校验路径存在，再启动后台进程。 |
 | `GET` | `/api/tasks/{id}` | `Task` |
 | `POST` | `/api/tasks/{id}/kill` | 结束进程，**保留**任务记录与已下载的分片 → `Task` |
 | `POST` | `/api/tasks/{id}/restart` | 用同样的命令重新起进程，任务 ID 不变。BaiduPCS-Go 会从断点续传 → `Task` |
@@ -138,7 +138,7 @@ stdout/stderr 字节透传给浏览器、提供列目录和任务增删这几个
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| `GET` | `/api/health` | `{"ok":true,"cliPath":"BaiduPCS-Go","saveRoot":"/home/hungtcs/Downloads","mode":"locate"}` |
+| `GET` | `/api/health` | `{"ok":true,"cliPath":"BaiduPCS-Go","saveRoot":"/home/user/Downloads","mode":"locate"}` |
 
 ## 终端 WebSocket
 

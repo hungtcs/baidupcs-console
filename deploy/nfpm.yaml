@@ -15,6 +15,7 @@ section: net
 priority: optional
 vendor: hungtcs
 homepage: https://github.com/hungtcs/baidupcs-console
+license: MIT
 maintainer: hungtcs <https://github.com/hungtcs>
 description: |
   百度网盘下载控制台 —— 给 BaiduPCS-Go 套一个网页界面，用于在局域网里远程浏览网盘、
@@ -47,6 +48,11 @@ contents:
 
   - src: docs/API.md
     dst: /usr/share/doc/baidupcs-console/API.md
+    file_info:
+      mode: 0o644
+
+  - src: LICENSE
+    dst: /usr/share/doc/baidupcs-console/LICENSE
     file_info:
       mode: 0o644
 

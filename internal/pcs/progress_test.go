@@ -108,7 +108,7 @@ func TestProgressDirectory(t *testing.T) {
 	}
 
 	// 当前文件是 adx.gif，49 字节，应该已经下完。
-	if prog.CurrentName == "adx.gif" {
+	if prog.CurrentName == "ass.gif" {
 		if prog.DoneBytes != 49 || prog.TotalBytes != 49 {
 			t.Errorf("adx.gif 应为 49/49 字节，实际 %d/%d", prog.DoneBytes, prog.TotalBytes)
 		}
@@ -186,7 +186,7 @@ func TestProgressEmptyInput(t *testing.T) {
 	}
 
 	// 只有与进度无关的输出，也不该凭空造出进度。
-	p.Write([]byte("[1] 加入下载队列: /我的资源/a.pdf\n[1] 准备下载: /我的资源/a.pdf\n"))
+	p.Write([]byte("[1] 加入下载队列: /示例资料/a.pdf\n[1] 准备下载: /示例资料/a.pdf\n"))
 	if prog := p.Snapshot(); prog != nil {
 		t.Errorf("没有进度行时应该返回 nil，实际 %+v", prog)
 	}
@@ -196,7 +196,7 @@ func TestProgressEmptyInput(t *testing.T) {
 func TestProgressFileCompletionSnapsTo100(t *testing.T) {
 	p := NewProgressParser()
 	p.Write([]byte(
-		"[1] 准备下载: /我的资源/a.bin\n" +
+		"[1] 准备下载: /示例资料/a.bin\n" +
 			"[1] ↓ 900B/1000B 100B/s in 9s, left 1s ............\r" +
 			"[1] 下载完成, 保存位置: /tmp/a.bin\n" +
 			"[1] 跳过文件有效性检验\n" +
