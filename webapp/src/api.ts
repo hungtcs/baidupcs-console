@@ -86,6 +86,8 @@ export interface BrowseResult {
 
 export interface Health {
   ok: boolean
+  /** 后端版本号，构建时注入；直接 go build 时是 "dev" */
+  version: string
   cliPath: string
   saveRoot: string
   mode: string

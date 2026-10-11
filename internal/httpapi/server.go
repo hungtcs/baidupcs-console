@@ -25,15 +25,17 @@ type Server struct {
 	manager *session.Manager
 	cli     *pcs.Client
 	web     fs.FS
+	version string
 }
 
 // New 构造 HTTP 处理器。
-func New(cfg config.Config, manager *session.Manager, web fs.FS) *echo.Echo {
+func New(cfg config.Config, manager *session.Manager, web fs.FS, version string) *echo.Echo {
 	s := &Server{
 		cfg:     cfg,
 		manager: manager,
 		cli:     &pcs.Client{CLIPath: cfg.CLIPath},
 		web:     web,
+		version: version,
 	}
 
 	e := echo.NewWithConfig(echo.Config{

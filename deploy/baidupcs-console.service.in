@@ -1,0 +1,52 @@
+# systemd **用户**服务模板。脚本 scripts/install-service.sh 会把 @XXX@ 替换成实际值，
+# 生成到 ~/.config/systemd/user/。
+#
+# 为什么是用户服务而不是系统服务：
+#   这个程序 exec 的 BaiduPCS-Go 从 ~/.config/BaiduPCS-Go/ 读登录态，下载落在
+#   ~/Downloads。跑成系统服务就是 root 身份、HOME=/root，这两处都会找不到，
+#   得额外配 User= 和 Environment=HOME= 才能绕回来。用户服务天然就是当前用户，
+#   再配合 `loginctl enable-linger` 就能不登录也开机自启。
+#
+# 改完要 `systemctl --user daemon-reload` 才生效。
+
+[Unit]
+Description=BaiduPCS-Console — 百度网盘下载控制台
+After=network-online.target
+Wants=network-online.target
+
+# 起不来时别无限重试刷日志。撞端口之类的问题会在这里被拦住，
+# 处理完用 `systemctl --user reset-failed baidupcs-console` 再启动。
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=%h
+ExecStart=%h/.local/bin/baidupcs-console
+
+# BaiduPCS-Go 的路径写死成绝对路径，免得依赖用户管理器的 PATH。
+# 装的时候由安装脚本探测填入。
+Environment=BPCS_CLI_PATH=@CLI_PATH@
+Environment=BPCS_LISTEN=@LISTEN@
+Environment=BPCS_SAVE_ROOT=%h/Downloads
+# 任务记录（一个任务一个 JSON）。放 XDG 数据目录，不放在仓库里。
+Environment=BPCS_DATA_DIR=%h/.local/share/baidupcs-console
+
+# 下载是长任务，崩了自动拉起来；正常退出（Ctrl+C / systemctl stop）不重启。
+Restart=on-failure
+RestartSec=5
+
+# 停服务时要把整棵进程树收掉，包括正在跑的 BaiduPCS-Go。
+# systemd 默认就是 control-group，这里显式写出来是因为它对本案很关键。
+KillMode=control-group
+# 收到 SIGTERM 后程序会先杀掉所有下载进程再关 HTTP 服务，留足时间。
+TimeoutStopSec=30
+
+NoNewPrivileges=true
+
+# 注意：不要加 ProtectHome / PrivateUsers / PrivateTmp 之类的隔离。
+# 这个服务本来就是要读写 ~/Downloads 和 ~/.config/BaiduPCS-Go/，
+# 隔离掉就跑不起来了。
+
+[Install]
+WantedBy=default.target

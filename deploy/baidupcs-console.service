@@ -1,0 +1,57 @@
+# 由 deb / rpm 包安装到 /usr/lib/systemd/user/baidupcs-console.service 的 unit。
+#
+# 为什么是**用户** unit 而不是系统 unit：
+#   这个程序 exec 的 BaiduPCS-Go 从 ~/.config/BaiduPCS-Go/ 读登录态，下载落在
+#   ~/Downloads。装成系统服务就是 root 身份、HOME=/root，这两处都找不到。
+#   /usr/lib/systemd/user/ 是 systemd 规定的、软件包可以放用户 unit 的位置，
+#   下面的 %h 由 systemd 在运行时按实际用户展开，所以一份文件对所有用户都成立。
+#
+# 装完由用户自己启用（软件包没法替某个用户开用户服务）：
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now baidupcs-console
+#   loginctl enable-linger "$USER"     # 不登录也开机自启
+#
+# 注意：仓库里的 deploy/baidupcs-console.service.in 是给本地开发用的另一份
+# （task deploy 会把二进制装到 ~/.local/bin，因此 ExecStart 不同）。改一处记得看另一处。
+
+[Unit]
+Description=BaiduPCS-Console — 百度网盘下载控制台
+After=network-online.target
+Wants=network-online.target
+
+# 起不来时别无限重试刷日志。
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=%h
+ExecStart=/usr/bin/baidupcs-console
+
+# 刻意不设 BPCS_CLI_PATH：BaiduPCS-Go 不属于这个包，装在哪由用户决定。
+# 程序默认走 PATH 查找（BaiduPCS-Go），不在 PATH 里就加一个 override：
+#   systemctl --user edit baidupcs-console
+#   [Service]
+#   Environment=BPCS_CLI_PATH=/usr/local/bin/BaiduPCS-Go
+Environment=BPCS_LISTEN=0.0.0.0:8080
+Environment=BPCS_SAVE_ROOT=%h/Downloads
+# 任务记录（一个任务一个 JSON）。放 XDG 数据目录。
+Environment=BPCS_DATA_DIR=%h/.local/share/baidupcs-console
+
+# 下载是长任务，崩了自动拉起来；正常退出（systemctl stop）不重启。
+Restart=on-failure
+RestartSec=5
+
+# 停服务时要把整棵进程树收掉，包括正在跑的 BaiduPCS-Go。
+# systemd 默认就是 control-group，这里显式写出来是因为它对本案很关键。
+KillMode=control-group
+# 收到 SIGTERM 后程序会先杀掉所有下载进程再关 HTTP 服务，留足时间。
+TimeoutStopSec=30
+
+NoNewPrivileges=true
+
+# 注意：不要加 ProtectHome / PrivateUsers 之类的隔离。
+# 这个服务本来就是要读写 ~/Downloads 和 ~/.config/BaiduPCS-Go/，隔离掉就跑不起来。
+
+[Install]
+WantedBy=default.target

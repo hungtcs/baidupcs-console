@@ -14,6 +14,7 @@ import (
 func (s *Server) health(c *echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]any{
 		"ok":       true,
+		"version":  s.version,
 		"cliPath":  s.cfg.CLIPath,
 		"saveRoot": s.cfg.SaveRoot,
 		"mode":     s.cfg.Mode,

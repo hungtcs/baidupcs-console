@@ -1,0 +1,55 @@
+# nfpm 打包配置：一份文件同时出 deb 和 rpm。
+#
+# 里面的 ${ARCH} ${VERSION} 是占位符，由 CI（或本地 `task package`）用 envsubst 渲染。
+# nfpm 只负责把文件摆进包、生成元数据；构建二进制是外面的事。
+#
+# 手动跑一次看效果：
+#   ARCH=amd64 VERSION=0.1.0 envsubst < deploy/nfpm.yaml > /tmp/nfpm.yaml
+#   nfpm package -f /tmp/nfpm.yaml -p deb -t dist/
+
+name: baidupcs-console
+arch: ${ARCH}
+platform: linux
+version: ${VERSION}
+section: net
+priority: optional
+vendor: hungtcs
+homepage: https://github.com/hungtcs/baidupcs-console
+maintainer: hungtcs <https://github.com/hungtcs>
+description: |
+  百度网盘下载控制台 —— 给 BaiduPCS-Go 套一个网页界面，用于在局域网里远程浏览网盘、
+  发起下载、看实时进度。
+
+  后端只是个薄薄的调用器：把 BaiduPCS-Go 当后台进程跑起来，把它的原始输出透传给浏览器里的
+  终端，再提供列目录和任务增删这几个接口。
+
+  ⚠️ 服务不对任何请求做鉴权，并按局域网自用设计监听 0.0.0.0。不要暴露到公网。
+
+  运行前需要自行安装并登录 BaiduPCS-Go（BaiduPCS-Go login）。
+
+contents:
+  # 二进制。前端产物已经 go:embed 进去了，包体就这一个可执行文件。
+  - src: dist/baidupcs-console_linux_${ARCH}
+    dst: /usr/bin/baidupcs-console
+    file_info:
+      mode: 0o755
+
+  # systemd 用户 unit。装到这里用户才能 systemctl --user enable。
+  - src: deploy/baidupcs-console.service
+    dst: /usr/lib/systemd/user/baidupcs-console.service
+    file_info:
+      mode: 0o644
+
+  - src: README.md
+    dst: /usr/share/doc/baidupcs-console/README.md
+    file_info:
+      mode: 0o644
+
+  - src: docs/API.md
+    dst: /usr/share/doc/baidupcs-console/API.md
+    file_info:
+      mode: 0o644
+
+scripts:
+  # 用户 unit 没法由包替某个用户启用，所以这里只把该敲的命令打出来。
+  postinstall: deploy/scripts/postinstall.sh

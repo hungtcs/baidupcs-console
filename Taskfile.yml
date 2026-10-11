@@ -41,6 +41,18 @@ tasks:
     cmds:
       - ./scripts/dev.sh
 
+  package:
+    desc: 交叉编译并打出 deb / rpm（VERSION=0.1.0 task package）
+    cmds:
+      - task: web
+      - ./scripts/package.sh
+
+  deploy:
+    desc: 构建并装成 systemd 用户服务（开机自启、崩了自动拉起）
+    cmds:
+      - task: build
+      - ./scripts/install-service.sh
+
   check:
     desc: 静态检查（go vet + go test + tsc + oxlint）
     cmds:

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { LuArrowLeft, LuCloudDownload, LuFolderOpen, LuMonitorCog } from 'react-icons/lu'
+import { LuArrowLeft, LuCloudDownload, LuFolderOpen, LuInfo, LuMonitorCog } from 'react-icons/lu'
 import { getHealth, toErrorMessage } from '../api'
 import type { Health, Task } from '../api'
 import { renderFileIcon } from '../fileIcon'
@@ -199,6 +199,15 @@ function EnvironmentSection() {
         <p className="overview-hint">读取中…</p>
       ) : (
         <dl className="env-list">
+          <div className="env-item">
+            <dt>
+              <LuInfo aria-hidden="true" />
+              版本
+            </dt>
+            <dd>
+              <code>{health.version}</code>
+            </dd>
+          </div>
           <div className="env-item">
             <dt>
               <LuMonitorCog aria-hidden="true" />

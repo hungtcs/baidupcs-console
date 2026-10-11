@@ -1,0 +1,91 @@
+name: release
+
+# 打 tag（v*）就自动构建、打 deb/rpm、发 Release。
+# 也可以在 Actions 页面手动触发一次，用来验证流程——手动跑不会创建 Release，
+# 产物只留在该次运行的 artifacts 里。
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 手动跑时用的版本号（不会创建 Release）
+        required: false
+        default: 0.0.0-dev
+
+# 创建 Release 需要写权限。
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: pnpm/action-setup@v4
+        with:
+          # 和本地保持一致；lockfile 是 pnpm 12 的格式，大版本对不上 --frozen-lockfile 会直接失败
+          version: 12.10.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: webapp/pnpm-lock.yaml
+
+      # 必须先构建前端：后端是 go:embed 把它嵌进二进制的，
+      # 顺序反了打出来的包前端会是空的。
+      - name: 构建前端
+        run: ./scripts/build-web.sh
+
+      - name: 单元测试
+        run: go test ./...
+
+      - name: 决定版本号
+        id: version
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            # v1.2.3 → 1.2.3：deb/rpm 的版本号不带前缀 v
+            echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 安装 nfpm
+        run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.47.0
+
+      - name: 交叉编译并打包
+        run: VERSION="${{ steps.version.outputs.value }}" ./scripts/package.sh
+
+      # 手动跑的时候没有 Release，产物留在这里方便下载核对
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ steps.version.outputs.value }}
+          path: |
+            dist/*.deb
+            dist/*.rpm
+          if-no-files-found: error
+
+      - name: 创建 Release
+        if: steps.version.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # 用 runner 自带的 gh，省掉一个第三方 action。
+          # 已经存在同名 Release（重跑）时改成覆盖上传资产。
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes \
+            --verify-tag \
+            dist/*.deb dist/*.rpm \
+          || gh release upload "${GITHUB_REF_NAME}" dist/*.deb dist/*.rpm --clobber

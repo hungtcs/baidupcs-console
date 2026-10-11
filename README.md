@@ -46,6 +46,127 @@ task build     # 构建前端 + 后端 → build/bpcs-console
 | `task test` | 只跑后端单元测试 |
 | `task clean` | 清理构建产物 |
 
+## 打包与发版
+
+打一个 tag 就会自动构建、打包、发 Release：
+
+```bash
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+GitHub Actions（`.github/workflows/release.yml`）会：构建前端 → 跑测试 → 交叉编译
+amd64/arm64 → 用 [nfpm](https://nfpm.goreleaser.com/) 打出 deb 和 rpm → 创建 Release 并把包挂上去。
+
+也可以在 Actions 页面手动触发一次（`workflow_dispatch`）验证流程，手动跑**不会**创建 Release，
+产物只留在该次运行的 artifacts 里。
+
+### 包里装了什么
+
+| 路径 | 说明 |
+| --- | --- |
+| `/usr/bin/baidupcs-console` | 二进制，前端已经 `go:embed` 进去，就这一个文件 |
+| `/usr/lib/systemd/user/baidupcs-console.service` | systemd **用户** unit |
+| `/usr/share/doc/baidupcs-console/` | README 与接口文档 |
+
+包**不会**自动启用服务——用户 unit 没法由安装脚本替某个用户开启，而且这个程序要读那个用户的
+`~/.config/BaiduPCS-Go/` 登录态、写他的 `~/Downloads`，默认跑成谁都不对。装完的提示会告诉你敲什么：
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now baidupcs-console
+loginctl enable-linger "$USER"
+```
+
+`BaiduPCS-Go` 不属于这个包，所以 unit 里没写死它的路径、走 PATH 查找。找不到就加个 override：
+
+```bash
+systemctl --user edit baidupcs-console
+# [Service]
+# Environment=BPCS_CLI_PATH=/usr/local/bin/BaiduPCS-Go
+```
+
+### 本地打包
+
+```bash
+VERSION=0.1.0 task package                 # amd64 + arm64
+VERSION=0.1.0 ARCHES=amd64 task package    # 只出 amd64
+```
+
+需要 nfpm：`go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.47.0`。
+产物在 `dist/`。
+
+### 版本号
+
+构建时通过 `-ldflags -X main.version=...` 注入（见 `scripts/package.sh`）。直接 `go build` 则是 `dev`。
+
+```bash
+baidupcs-console --version     # 打印版本后退出
+```
+
+运行中的实例会把版本显示在概览页的「运行环境」里，也写进 `GET /api/health` 的 `version`。
+
+## 部署（systemd 用户服务）
+
+```bash
+task deploy      # 构建 → 装到 ~/.local/bin → 生成 unit → 开机自启 → 启动
+```
+
+**为什么是用户服务而不是系统服务**：这个程序 exec 的 `BaiduPCS-Go` 从
+`~/.config/BaiduPCS-Go/` 读登录态，下载落在 `~/Downloads`。跑成系统服务就是 root 身份、
+`HOME=/root`，这两处都找不到，得额外配 `User=` 和 `Environment=HOME=` 才能绕回来。
+用户服务天然就是当前用户，再配合 `loginctl enable-linger` 就能不登录也开机自启。
+
+`task deploy` 做了这些：
+
+1. 把二进制装到 `~/.local/bin/baidupcs-console`；
+2. 探测 `BaiduPCS-Go` 的实际路径（写死进 unit，不依赖 systemd 的 PATH）；
+3. 由 `deploy/baidupcs-console.service.in` 生成 unit 到 `~/.config/systemd/user/`；
+4. `loginctl enable-linger $USER` —— 不登录也随开机启动；
+5. `daemon-reload` + `enable` + `restart`。
+
+任务记录放在 `~/.local/share/baidupcs-console`（XDG 数据目录，不在仓库里）。
+
+### 日常操作
+
+```bash
+systemctl --user status  baidupcs-console       # 状态
+systemctl --user restart baidupcs-console       # 重启（等于重新 task deploy 的第二步）
+systemctl --user stop    baidupcs-console       # 停止
+journalctl --user -u baidupcs-console -f        # 跟日志
+loginctl show-user "$USER" --property=Linger    # 确认 linger 开着
+```
+
+改端口：`BPCS_LISTEN=0.0.0.0:8081 task deploy`。
+
+更新版本：`task deploy` 再来一次即可（会重新装二进制并重启服务）。
+
+### ⚠️ 重启会打断正在跑的下载
+
+`systemctl --user restart`（以及 `task deploy`）会先杀掉所有还在跑的 `BaiduPCS-Go`，
+再关服务。已下载的分片和断点续传元数据都会保留，重启后任务显示为「已停止」，
+点「继续」就从断点接着下——但**下载确实会中断一下**，别在下大文件时随手重启。
+
+服务起不来时先在 journal 里看原因。撞端口之类的会被 `StartLimitBurst=5` 拦下，
+处理完之后要 `systemctl --user reset-failed baidupcs-console` 才能再启动。
+
+### 局域网访问放行端口
+
+Fedora 默认开着 firewalld，不放行的话手机连不上：
+
+```bash
+sudo firewall-cmd --add-port=8080/tcp --permanent && sudo firewall-cmd --reload
+```
+
+### 卸载
+
+```bash
+systemctl --user disable --now baidupcs-console
+rm -f ~/.config/systemd/user/baidupcs-console.service ~/.local/bin/baidupcs-console
+systemctl --user daemon-reload
+# 任务记录和已下载的文件都在，要清就自己删：
+#   ~/.local/share/baidupcs-console/
+```
+
 ## 配置
 
 全部走环境变量，可选地写进 `.env`（参考 `.env.example`）。优先级：进程环境变量 > `.env` > 内置默认值。

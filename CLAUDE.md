@@ -226,6 +226,28 @@ docs/API.md      接口契约（改接口必须同步改这里）
   「有没有输出」由 `useTerminal` 的 `hasOutput` 判断（收到过非空二进制帧）。停止且从未有输出的任务
   （典型是服务重启后恢复出来的）显示空状态而不是一块黑窗口。
 
+## 打包、部署与发版
+
+```bash
+VERSION=0.1.0 task package    # 交叉编译 amd64+arm64，打成 deb / rpm（需要 nfpm）
+task deploy                    # 装成 systemd 用户服务，本地开发用
+```
+
+- **版本号**由构建时注入：`-ldflags "-X main.version=..."`，只改 `main.go` 里那个 `var version`。
+  没注入时是 `dev`。`--version` 打印后退出；运行中的实例把它显示在概览页「运行环境」，
+  也写进 `GET /api/health` 的 `version`。
+- **打包配置** `deploy/nfpm.yaml` 里 `${ARCH}` `${VERSION}` 是占位符，由 `scripts/package.sh`
+  用 sed 渲染。nfpm 会自动把 `amd64`/`arm64` 映射成 rpm 的 `x86_64`/`aarch64`，所以一份架构名
+  对两种包都成立，不用分别渲染。
+- **有两条 unit，别搞混**：`deploy/baidupcs-console.service` 是打进包里、装到
+  `/usr/lib/systemd/user/` 的那份（`ExecStart=/usr/bin/...`）；`deploy/baidupcs-console.service.in`
+  是 `task deploy` 本地用的模板（装到 `~/.local/bin/`）。改一处记得看另一处，两份文件头部都写了这条。
+- 包**不自动启用服务**：用户 unit 没法由安装脚本替某个用户开启，而且这程序要读那个用户的
+  `~/.config/BaiduPCS-Go/` 登录态、写他的 `~/Downloads`，默认跑成谁都不对。postinstall 只打印该敲的命令。
+- **发版**：`.github/workflows/release.yml`，推 `v*` tag 触发。顺序是「先构建前端再交叉编译」——
+  后端是 `go:embed` 把前端嵌进去的，反了打出来的包前端会是空的。也支持 `workflow_dispatch`
+  手动跑一遍验证流程（手动跑不创建 Release）。
+
 ## 安全
 
 服务**不鉴权**，默认监听 `0.0.0.0`，按局域网自用设计。`upgrader.CheckOrigin` 恒返回 true，任何站点都能连上终端。不要把它暴露到公网，也不要在没有明确要求的情况下"顺手加上"鉴权——需要时先问用户。

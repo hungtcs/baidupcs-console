@@ -30,7 +30,7 @@ func newTestServer(t *testing.T) http.Handler {
 		"assets/app.js": &fstest.MapFile{Data: []byte("console.log('app')")},
 	}
 
-	return New(cfg, newManager(t, cfg), web)
+	return New(cfg, newManager(t, cfg), web, "test")
 }
 
 // newManager 造一个用临时目录做数据目录的管理器。
@@ -161,7 +161,7 @@ func TestSPAFallbackWhenFrontendMissing(t *testing.T) {
 	// 模拟前端还没构建过：dist 里只有 .gitkeep。
 	web := fstest.MapFS{".gitkeep": &fstest.MapFile{}}
 
-	h := New(cfg, newManager(t, cfg), web)
+	h := New(cfg, newManager(t, cfg), web, "test")
 	rec := do(t, h, http.MethodGet, "/", "")
 
 	if rec.Code != http.StatusNotFound {

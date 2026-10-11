@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -22,9 +23,19 @@ import (
 	"github.com/hungtcs/baidupcs-console/internal/session"
 )
 
+// version 在构建时注入：-ldflags "-X main.version=v1.2.3"。
+// 没注入时是 dev（直接 go build 的情况）。
+var version = "dev"
+
 func main() {
 	envFile := flag.String("env", config.EnvFile, "dotenv 配置文件路径")
+	showVersion := flag.Bool("version", false, "打印版本号后退出")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("baidupcs-console %s\n", version)
+		return
+	}
 
 	if err := run(*envFile); err != nil {
 		slog.Error("启动失败", "error", err)
@@ -51,7 +62,7 @@ func run(envFile string) error {
 		return err
 	}
 
-	handler := httpapi.New(cfg, manager, webFS())
+	handler := httpapi.New(cfg, manager, webFS(), version)
 
 	srv := &http.Server{
 		Addr:              cfg.Listen,
@@ -66,6 +77,7 @@ func run(envFile string) error {
 	errCh := make(chan error, 1)
 	go func() {
 		slog.Info("BaiduPCS-Console 已启动",
+			"version", version,
 			"listen", cfg.Listen,
 			"cli", cfg.CLIPath,
 			"saveRoot", cfg.SaveRoot,
