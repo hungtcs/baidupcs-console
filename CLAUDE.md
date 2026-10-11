@@ -244,6 +244,11 @@ task deploy                    # 装成 systemd 用户服务，本地开发用
   是 `task deploy` 本地用的模板（装到 `~/.local/bin/`）。改一处记得看另一处，两份文件头部都写了这条。
 - 包**不自动启用服务**：用户 unit 没法由安装脚本替某个用户开启，而且这程序要读那个用户的
   `~/.config/BaiduPCS-Go/` 登录态、写他的 `~/Downloads`，默认跑成谁都不对。postinstall 只打印该敲的命令。
+- **预发布版本**（tag 里带 `-`，如 `v0.1.0-test.1`）必须显式 `--prerelease`：GitHub **不会**
+  只看 tag 名字自动判断，不标的话它会显示成仓库的 Latest release，看起来像能直接用的正式版。
+- **别被 Release 附件的文件名骗了**：nfpm 产出的包名是 `0.1.0~test.1`（`~` 让预发布排在正式版
+  之前，这是对的），但 GitHub 上传附件时会把 `~` 换成 `.`，附件名变成 `0.1.0.test.1`。
+  包**内部**的版本号不受影响（`dpkg-deb -f x.deb Version` 查得到），升级顺序是对的。
 - **发版**：`.github/workflows/release.yml`，推 `v*` tag 触发。顺序是「先构建前端再交叉编译」——
   后端是 `go:embed` 把前端嵌进去的，反了打出来的包前端会是空的。也支持 `workflow_dispatch`
   手动跑一遍验证流程（手动跑不创建 Release）。

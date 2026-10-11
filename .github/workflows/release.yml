@@ -80,12 +80,18 @@ jobs:
         if: steps.version.outputs.release == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.value }}
         run: |
           # 用 runner 自带的 gh，省掉一个第三方 action。
+          args=(--title "${GITHUB_REF_NAME}" --generate-notes --verify-tag)
+
+          # 预发布版本（如 0.1.0-test.1）必须显式标成 prerelease：GitHub 不会
+          # 只看 tag 名字自动判断，不标的话它会显示成仓库的 Latest release，
+          # 看起来像个可以拿去用的正式版。
+          if [[ "${VERSION}" == *-* ]]; then
+            args+=(--prerelease)
+          fi
+
           # 已经存在同名 Release（重跑）时改成覆盖上传资产。
-          gh release create "${GITHUB_REF_NAME}" \
-            --title "${GITHUB_REF_NAME}" \
-            --generate-notes \
-            --verify-tag \
-            dist/*.deb dist/*.rpm \
-          || gh release upload "${GITHUB_REF_NAME}" dist/*.deb dist/*.rpm --clobber
+          gh release create "${GITHUB_REF_NAME}" "${args[@]}" dist/*.deb dist/*.rpm \
+            || gh release upload "${GITHUB_REF_NAME}" dist/*.deb dist/*.rpm --clobber
