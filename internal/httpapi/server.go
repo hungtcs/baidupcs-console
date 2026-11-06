@@ -86,6 +86,12 @@ func errorHandler(c *echo.Context, err error) {
 	}
 }
 
+// pwaTypes 显式声明 PWA 资源的 Content-Type。.webmanifest 不在 Go 内置的
+// mime 表里，只靠 /etc/mime.types 的话，精简系统上会被当成 text/plain。
+var pwaTypes = map[string]string{
+	".webmanifest": "application/manifest+json",
+}
+
 // spaHandler 优先返回静态文件，找不到就把 index.html 交出去。
 func spaHandler(fsys fs.FS) http.Handler {
 	files := http.FileServerFS(fsys)
@@ -98,6 +104,9 @@ func spaHandler(fsys fs.FS) http.Handler {
 
 		if f, err := fsys.Open(rel); err == nil {
 			_ = f.Close()
+			if ct, ok := pwaTypes[path.Ext(rel)]; ok {
+				w.Header().Set("Content-Type", ct)
+			}
 			files.ServeHTTP(w, r)
 			return
 		}

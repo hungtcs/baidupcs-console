@@ -26,8 +26,9 @@ func newTestServer(t *testing.T) http.Handler {
 	}
 
 	web := fstest.MapFS{
-		"index.html":    &fstest.MapFile{Data: []byte("<html>baidupcs-console</html>")},
-		"assets/app.js": &fstest.MapFile{Data: []byte("console.log('app')")},
+		"index.html":           &fstest.MapFile{Data: []byte("<html>baidupcs-console</html>")},
+		"assets/app.js":        &fstest.MapFile{Data: []byte("console.log('app')")},
+		"manifest.webmanifest": &fstest.MapFile{Data: []byte(`{"name":"baidupcs-console"}`)},
 	}
 
 	return New(cfg, newManager(t, cfg), web, "test")
@@ -148,6 +149,20 @@ func TestStaticAndSPAFallback(t *testing.T) {
 				t.Errorf("响应体应包含 %q，实际 %q", c.wantBody, rec.Body.String())
 			}
 		})
+	}
+}
+
+// .webmanifest 不在 Go 内置的 mime 表里，必须由服务端显式声明类型，
+// 否则精简系统上没有 /etc/mime.types 时会退化成 text/plain。
+func TestWebManifestContentType(t *testing.T) {
+	h := newTestServer(t)
+	rec := do(t, h, http.MethodGet, "/manifest.webmanifest", "")
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("状态码应为 200，实际 %d", rec.Code)
+	}
+	if got := rec.Header().Get("Content-Type"); got != "application/manifest+json" {
+		t.Errorf("Content-Type 应为 application/manifest+json，实际 %q", got)
 	}
 }
 

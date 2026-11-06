@@ -158,6 +158,23 @@ docs/API.md      接口契约（改接口必须同步改这里）
 - 选中任务的进度有两条来源：列表轮询（2 秒）和终端 WebSocket（1 秒）。`App` 用后者覆盖 `listTasks` 里对应的那一条，让正在看的任务跟手一些。
 - React Compiler 已启用；StrictMode 会双调用 effect，创建 xterm / WebSocket 的地方要保证 cleanup 干净。
 
+### PWA（只求可安装，不做离线）
+
+组件是 `public/manifest.webmanifest`、`public/sw.js` 和 `main.tsx` 里的注册（只在
+`import.meta.env.PROD` 时注册，避免开发服务器留下常驻 worker）。**service worker 刻意不缓存
+任何东西**，所有请求照常走网络；它唯一的作用是满足浏览器「可安装」的条件（需要注册一个带 fetch
+处理器的 worker）。不要给它加 precache——这是内嵌单二进制的局域网工具，后端升级后前端命中旧缓存
+只会让界面和后端对不上。
+
+图标由 `public/favicon.svg` 生成：`icon-192.png`、`icon-512.png`、`icon-maskable-512.png`
+（满版底色 + 安全区内的箭头）和 iOS 用的 `apple-touch-icon.png`（180，深色底）。换图标要一起重新生成。
+
+`.webmanifest` 不在 Go 内置的 mime 表里，`spaHandler` 里显式声明了
+`application/manifest+json`，不要依赖系统 `/etc/mime.types`。
+
+**注意安装的硬性前提是安全上下文**：通过 `localhost` 或 HTTPS 访问才能注册 service worker 并安装；
+直接用局域网 IP + HTTP 访问时 `navigator.serviceWorker` 不存在，配置本身没问题，但浏览器不会给安装入口。
+
 ### 速度曲线（`uplot`）
 
 后端为每个任务在内存里保留最近 300 个速度采样（`speedHistory`，进度行约每秒一条，即最近 5 分钟），
